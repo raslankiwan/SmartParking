@@ -1,1 +1,1 @@
-export const SERVER_ADDRESS = '127.0.0.1:8082';
+export const SERVER_ADDRESS = 'http://192.168.1.112:8082';

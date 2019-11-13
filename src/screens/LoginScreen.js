@@ -2,6 +2,8 @@ import React from 'react';
 import { Text, TouchableWithoutFeedback, View, Image, ActivityIndicator,AsyncStorage } from 'react-native';
 import {Button, Input} from 'react-native-elements'
 import COLOR from '../constants/Colors'
+import { postRequest } from '../globals/RequestFetch'
+import {SERVER_ADDRESS} from '../constants/ServerConstants'
 // import console = require('console');
 
 class LoginScreen extends React.Component {
@@ -20,8 +22,8 @@ class LoginScreen extends React.Component {
       pageLoading:true
     };
   }
-  componentWillMount(){
-    this.checkUserCredentialsExisting();
+  componentDidMount(){
+    //this.checkUserCredentialsExisting();
    
   }
 
@@ -52,6 +54,7 @@ class LoginScreen extends React.Component {
     
     }
   }
+
   toggleUserLoginningIn = (initialBoolean=null) =>{
     if (!initialBoolean) {
       initialBoolean=this.state.form.userLoginningIn;
@@ -72,7 +75,7 @@ class LoginScreen extends React.Component {
       this.setState({emailError: 'Invalid Email !!'});
     }
 
-  this.props.emailChanged(text);
+ // this.props.emailChanged(text);
   }
 
   onPasswordChange(text) {
@@ -81,11 +84,20 @@ class LoginScreen extends React.Component {
     } else {
       this.setState({ passwordError: 'This field cannot be empty !!'})
     }
-    this.props.passwordChanged(text);
+    //this.props.passwordChanged(text);
+  }
+
+  onSuccess() {
+    console.log('Success')
+  }
+
+  onFail() {
+    console.log('Fail')
   }
 
   onButtonPress() {
-    this.props.loginUser(this.props);
+    let url = `${SERVER_ADDRESS}/auth`
+    postRequest(url, {email:'raslan', password: '12345'}, 'POST', this.onSuccess, this.onFail)
   }
 
   onRegisterPress() {

@@ -8,16 +8,16 @@ import {
   StatusBar,
   AsyncStorge
 } from 'react-native';
-import {SERVER_ADDRESS} from './src/constants/ServerConstants'
+// import {SERVER_ADDRESS} from './src/constants/ServerConstants'
 
 import AppNavigator from './src/navigation/AppNavigator';
-
+console.disableYellowBox = true;
 export default class App extends React.Component {
 
 
 
     async componentDidMount() {
-      await AsyncStorge.setItem('serverURL', SERVER_ADDRESS)
+      // await AsyncStorge.setItem('serverURL', SERVER_ADDRESS)
     }
 
     render() {
