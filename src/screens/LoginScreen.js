@@ -15,6 +15,8 @@ class LoginScreen extends React.Component {
         password: '',
         userLoginningIn:false
       },
+      email: '',
+      password: '',
       loading:true,
       error:null, 
       emailError: '',
@@ -68,7 +70,7 @@ class LoginScreen extends React.Component {
     
     let reg = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/ ;
     if(reg.test(text)) {
-      this.setState({emailError: '', submit: true });
+      this.setState({emailError: '', submit: true, email: text });
     } else if (text.length < 1) {
       this.setState({emailError: 'This field cannot be empty !!'});
     } else {
@@ -80,7 +82,7 @@ class LoginScreen extends React.Component {
 
   onPasswordChange(text) {
     if (text.length !== 0){
-      this.setState({ passwordError: '' });
+      this.setState({ passwordError: '', password: text });
     } else {
       this.setState({ passwordError: 'This field cannot be empty !!'})
     }
@@ -224,21 +226,6 @@ class LoginScreen extends React.Component {
             <Text style={{color:'#f1e4e4', margin:20, fontSize:14, }}>Create account?</Text>
           </TouchableWithoutFeedback>
         </View>
-        {/* <Divider style={{width:'80%', height:1, backgroundColor:'#35234b'}} /> */}
-        {/* <View style={styles.SignUp}>
-          
-          <View style={{flexDirection:'column', justifyContent:'center'}}>
-            <Text style={{color:'#f1e4e4', fontSize:14, margin:8}}>OR Login with: </Text>
-            <Avatar
-            rounded
-            size='medium'
-            icon={{type: 'material-community', name:'facebook', color:COLOR.primary}}
-            overlayContainerStyle={{backgroundColor:'#f1e4e4', margin:8}}
-            />
-           </View>
-        </View> */}
-
-
       </View>
     );
   }
@@ -306,13 +293,5 @@ const styles = {
     color:'#f1e4e4'
   }, 
 };
-
-
-
-// const mapStateToProps = ({auth}) => {
-//   const { email, password, error, loading, shouldRedirect } = auth;
-
-//   return { email, password, error, loading, shouldRedirect };
-// };
 
 export default LoginScreen;
