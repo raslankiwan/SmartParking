@@ -2,6 +2,7 @@ import React from 'react';
 import { createAppContainer, createStackNavigator } from 'react-navigation';
 import HomeScreen from '../screens/HomeScreen';
 import LoginScreen from '../screens/LoginScreen'
+import RegisterScreen from '../screens/RegisterScreen';
 
 const RootStack = createStackNavigator(
   {
@@ -11,9 +12,9 @@ const RootStack = createStackNavigator(
       Login: {
           screen: LoginScreen,
       },
-    //   Add: {
-    //       screen: AddForm,
-    //   },
+      Register: {
+          screen: RegisterScreen,
+      },
     //   LocalData: {
     //     screen: LocalData
     //   }

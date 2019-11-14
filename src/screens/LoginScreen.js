@@ -4,7 +4,6 @@ import {Button, Input} from 'react-native-elements'
 import COLOR from '../constants/Colors'
 import { postRequest } from '../globals/RequestFetch'
 import {SERVER_ADDRESS} from '../constants/ServerConstants'
-// import console = require('console');
 
 class LoginScreen extends React.Component {
   constructor(props) {
@@ -89,22 +88,20 @@ class LoginScreen extends React.Component {
     //this.props.passwordChanged(text);
   }
 
-  onSuccess() {
+  onLoginSuccess() {
+    //code to save user info in async storage
+
     console.log('Success')
   }
 
-  onFail() {
+  onLoginFail() {
+    //code to display error message / popup
     console.log('Fail')
   }
 
-  onButtonPress() {
+  userLogin() {
     let url = `${SERVER_ADDRESS}/auth`
-    postRequest(url, {email:'raslan', password: '12345'}, 'POST', this.onSuccess, this.onFail)
-  }
-
-  onRegisterPress() {
-    this.props.navigation.navigate('Register');
-
+    postRequest(url, {email:'raslan', password: '12345'}, 'POST', this.onLoginSuccess, this.onLoginFail)
   }
 
   renderFacebookButton() {
@@ -120,6 +117,7 @@ class LoginScreen extends React.Component {
     );
   }
 
+  //modify to enable/disable button based on state variable
   renderButton() {
     const { emailError, passwordError, submit} = this.state;
 
@@ -138,7 +136,7 @@ class LoginScreen extends React.Component {
                 titleStyle={styles.btnText}
                 buttonStyle={styles.btnStyle}
                 // containerStyle={styles.btnContainer}
-                onPress={()=>{this.onButtonPress()}}
+                onPress={()=>{this.userLogin()}}
               />
             );
         }
@@ -222,7 +220,7 @@ class LoginScreen extends React.Component {
              {this.renderFacebookButton()}
           </View>
         
-          <TouchableWithoutFeedback onPress={()=>this.props.navigation.navigate('RegisterScreen')}>
+          <TouchableWithoutFeedback onPress={()=>this.props.navigation.navigate('Register')}>
             <Text style={{color:'#f1e4e4', margin:20, fontSize:14, }}>Create account?</Text>
           </TouchableWithoutFeedback>
         </View>
