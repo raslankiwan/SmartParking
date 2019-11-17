@@ -16,11 +16,10 @@ class LoginScreen extends React.Component {
       },
       email: '',
       password: '',
-      loading:true,
       error:null, 
       emailError: '',
       passwordError: '',
-      pageLoading:true
+     
     };
   }
   componentDidMount(){
@@ -44,13 +43,13 @@ class LoginScreen extends React.Component {
     
     if (!user) {
     //  this.props.setLoadingLogInForm(true); 
-      this.setState({pageLoading:false})
+      // this.setState({pageLoading:false})
     }else{
       user = JSON.parse(user);
      // this.props.setLoadingLogInForm(false); 
       // this.props.setLoadingLogInForm(true); 
       console.log('login user', user);
-     this.setState({pageLoading:false})
+    //  this.setState({pageLoading:false})
       this.props.navigation.navigate('MainNavigation'); 
     
     }
@@ -88,20 +87,22 @@ class LoginScreen extends React.Component {
     //this.props.passwordChanged(text);
   }
 
-  onLoginSuccess() {
-    //code to save user info in async storage
-
-    console.log('Success')
+  onLoginSuccess = async (json) => {
+    let user = json.user
+    await AsyncStorage.setItem('user', user)
+    this.props.navigation.navigate('Home')
   }
 
-  onLoginFail() {
+  onLoginFail = () => {
     //code to display error message / popup
+    alert('Couldn\'t sign in' )
     console.log('Fail')
   }
 
-  userLogin() {
+  userLogin = () => {
+    let { email, password } = this.state
     let url = `${SERVER_ADDRESS}/auth`
-    postRequest(url, {email:'raslan', password: '12345'}, 'POST', this.onLoginSuccess, this.onLoginFail)
+    postRequest(url, {email, password}, 'POST', this.onLoginSuccess, this.onLoginFail)
   }
 
   renderFacebookButton() {
@@ -124,11 +125,7 @@ class LoginScreen extends React.Component {
     if( emailError === '' &&
         passwordError === '' ) {
 
-        if(this.props.loading) {
-            return (
-              <ActivityIndicator size="large" />
-            );
-        } else {
+
             return (
               <Button
                 raised
@@ -139,7 +136,6 @@ class LoginScreen extends React.Component {
                 onPress={()=>{this.userLogin()}}
               />
             );
-        }
     
     } else if (!(emailError === '' &&
         passwordError === '')) {
@@ -163,17 +159,19 @@ class LoginScreen extends React.Component {
         );
     }
   }
-
-
- 
-  render() {
-    if(this.state.pageLoading){
+/*
+ if(this.state.pageLoading){
       return(
         <View style={{flex:1, justifyContent:'center', alignItems:'center'}}>
           <ActivityIndicator size='large' />
         </View>
       )
     }
+*/
+
+ 
+  render() {
+   
     return (
      
       <View style={styles.Wrapper}>

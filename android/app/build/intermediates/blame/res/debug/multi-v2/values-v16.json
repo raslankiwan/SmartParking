@@ -1,10 +1,10 @@
 {
     "logs": [
         {
-            "outputFile": "C:\\Raslan\\GitHub\\SmartParking\\android\\app\\build\\intermediates\\incremental\\mergeDebugResources\\merged.dir\\values-v16\\values-v16.xml",
+            "outputFile": "D:\\Projects\\React-Native\\SmartParking\\android\\app\\build\\intermediates\\incremental\\mergeDebugResources\\merged.dir\\values-v16\\values-v16.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\rkewan\\.gradle\\caches\\transforms-2\\files-2.1\\22d558b3651c7ac00c28d175805202ab\\res\\values-v16\\values-v16.xml",
+                    "source": "C:\\Users\\Raslan\\.gradle\\caches\\transforms-2\\files-2.1\\80d9e58c6842884134e32742150b776a\\res\\values-v16\\values-v16.xml",
                     "from": {
                         "startLines": "2",
                         "startColumns": "4",
@@ -14,7 +14,7 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\rkewan\\.gradle\\caches\\transforms-2\\files-2.1\\97ba85748790093865df8b7cb67644c9\\res\\values-v16\\values-v16.xml",
+                    "source": "C:\\Users\\Raslan\\.gradle\\caches\\transforms-2\\files-2.1\\4dd23978ba857007077500d17cadeb45\\res\\values-v16\\values-v16.xml",
                     "from": {
                         "startLines": "2",
                         "startColumns": "4",
