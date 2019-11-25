@@ -3,6 +3,9 @@ import { createAppContainer, createStackNavigator } from 'react-navigation';
 import HomeScreen from '../screens/HomeScreen';
 import LoginScreen from '../screens/LoginScreen'
 import RegisterScreen from '../screens/RegisterScreen';
+import Colors from '../constants/Colors';
+import StreetScreen from '../screens/StreetScreen';
+import ZoneScreen from '../screens/ZoneScreen';
 
 const RootStack = createStackNavigator(
   {
@@ -15,20 +18,25 @@ const RootStack = createStackNavigator(
       Register: {
           screen: RegisterScreen,
       },
-    //   LocalData: {
-    //     screen: LocalData
-    //   }
+      Street: {
+        screen: StreetScreen
+      },
+      Zone: {
+          screen: ZoneScreen
+      }
   },
   {
       initialRouteName: 'Login',
       defaultNavigationOptions: {
+          headerTitleStyle :{textAlign: 'center', flex: 1},
           headerStyle: {
-              backgroundColor: '#f4511e',
+              backgroundColor: Colors.secondary,
           },
           headerTintColor: '#fff',
           headerTitleStyle: {
               fontWeight: 'bold',
           },
+         
       },
   }
 );

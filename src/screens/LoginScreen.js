@@ -23,7 +23,7 @@ class LoginScreen extends React.Component {
     };
   }
   componentDidMount(){
-    //this.checkUserCredentialsExisting();
+    this.checkUserCredentialsExisting();
    
   }
 
@@ -38,19 +38,19 @@ class LoginScreen extends React.Component {
     
 
   checkUserCredentialsExisting = async () =>{
-    let user = await AsyncStorage.getItem('userInfo');
+    let user = await AsyncStorage.getItem('user');
 
     
     if (!user) {
     //  this.props.setLoadingLogInForm(true); 
       // this.setState({pageLoading:false})
-    }else{
+    } else {
       user = JSON.parse(user);
      // this.props.setLoadingLogInForm(false); 
       // this.props.setLoadingLogInForm(true); 
       console.log('login user', user);
     //  this.setState({pageLoading:false})
-      this.props.navigation.navigate('MainNavigation'); 
+      this.props.navigation.navigate('Home'); 
     
     }
   }
