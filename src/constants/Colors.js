@@ -13,5 +13,6 @@ export default {
   noticeText: '#fff',
   primary:'#5c3b6f', 
   secondary:'#15cda8',
+  secondaryLight: '#19ddbf' ,
   lightGray:'#d3d3d3'
 };

@@ -22,7 +22,8 @@ const RootStack = createStackNavigator(
         screen: StreetScreen
       },
       Zone: {
-          screen: ZoneScreen
+          screen: ZoneScreen,
+          //navigationOptions: () => {headerTitle: 'this is respected'}
       }
   },
   {
@@ -38,6 +39,7 @@ const RootStack = createStackNavigator(
           },
          
       },
+      headerLayoutPreset: 'center'
   }
 );
 

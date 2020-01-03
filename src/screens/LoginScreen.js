@@ -1,81 +1,54 @@
 import React from 'react';
-import { Text, TouchableWithoutFeedback, View, Image, ActivityIndicator,AsyncStorage } from 'react-native';
+import { Text, TouchableWithoutFeedback, View,  ActivityIndicator,AsyncStorage, Alert } from 'react-native';
 import {Button, Input} from 'react-native-elements'
 import COLOR from '../constants/Colors'
-import { postRequest } from '../globals/RequestFetch'
-import {SERVER_ADDRESS} from '../constants/ServerConstants'
+import firebase from 'firebase'
 
 class LoginScreen extends React.Component {
+
+  static navigationOptions =  ({ navigation }) => {
+    const { params } = navigation.state;
+    return params;
+}
+
   constructor(props) {
     super(props);
     this.state = {
-      form:{
-        email: '',
-        password: '',
-        userLoginningIn:false
-      },
       email: '',
       password: '',
       error:null, 
       emailError: '',
       passwordError: '',
-     
+      isLoading: false
     };
   }
   componentDidMount(){
     this.checkUserCredentialsExisting();
-   
+    this.props.navigation.setParams({
+      title: 'Smart Parking',
+    });
   }
 
-//   componentWillReceiveProps(nextProps) {
-//     if (nextProps.shouldRedirect) {
-//       this.props.navigation.navigate('MainNavigation');  
-//     }
-//   }
-//   shouldComponentUpdate(nextProps, nextState) {
-//      return true;
-//   }
-    
 
   checkUserCredentialsExisting = async () =>{
     let user = await AsyncStorage.getItem('user');
-
-    
     if (!user) {
-    //  this.props.setLoadingLogInForm(true); 
-      // this.setState({pageLoading:false})
     } else {
       user = JSON.parse(user);
-     // this.props.setLoadingLogInForm(false); 
-      // this.props.setLoadingLogInForm(true); 
-      console.log('login user', user);
-    //  this.setState({pageLoading:false})
       this.props.navigation.navigate('Home'); 
-    
     }
   }
 
-  toggleUserLoginningIn = (initialBoolean=null) =>{
-    if (!initialBoolean) {
-      initialBoolean=this.state.form.userLoginningIn;
-    }
-    let form = {...this.state.form};
-    form.userLoginningIn = !initialBoolean;                   
-    this.setState({form});
-  }
 
   onEmailChange(text) {
-    
-    let reg = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/ ;
-    if(reg.test(text)) {
-      this.setState({emailError: '', submit: true, email: text });
-    } else if (text.length < 1) {
-      this.setState({emailError: 'This field cannot be empty !!'});
-    } else {
-      this.setState({emailError: 'Invalid Email !!'});
-    }
-
- // this.props.emailChanged(text);
+      let reg = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/ ;
+      if(reg.test(text)) {
+        this.setState({emailError: '', submit: true, email: text });
+      } else if (text.length < 1) {
+        this.setState({emailError: 'This field cannot be empty !!'});
+      } else {
+        this.setState({emailError: 'Invalid Email !!'});
+      }
   }
 
   onPasswordChange(text) {
@@ -84,98 +57,76 @@ class LoginScreen extends React.Component {
     } else {
       this.setState({ passwordError: 'This field cannot be empty !!'})
     }
-    //this.props.passwordChanged(text);
   }
 
   onLoginSuccess = async (json) => {
+    this.setState({isLoading: false, email:'', password: ''})
     let user = json.user
     await AsyncStorage.setItem('user', user)
-    this.props.navigation.navigate('Home')
+    this.props.navigation.navigate('Home', {balance: user.balance})
   }
 
-  onLoginFail = () => {
-    //code to display error message / popup
-    alert('Couldn\'t sign in' )
-    console.log('Fail')
+  onLoginFail = (msg) => {
+    this.setState({isLoading: false})
+    Alert.alert('Login Error', msg)
   }
 
   userLogin = () => {
+    this.setState({isLoading: true})
     let { email, password } = this.state
-    let url = `${SERVER_ADDRESS}/auth`
-    postRequest(url, {email, password}, 'POST', this.onLoginSuccess, this.onLoginFail)
+    if (email =='' || password=='') {
+      this.onLoginFail('Please enter email and password')
+    }
+    let userResult = {}
+    firebase.auth().signInWithEmailAndPassword(email, password)
+    .then(user => {
+        firebase.database().ref(`/users/`)
+        .on('value', snapshot => {
+            snapshot.forEach(child => {
+                if (child.val().uid == user.user.uid) {
+                    userResult = {
+                        email: child.val().email ,
+                        firstName: child.val().firstName,
+                        lastName: child.val().lastName,
+                        phone: child.val().phone,
+                        balance: child.val().balance,
+                        uid: child.val().uid,
+                        key: child.key
+                    }
+                }
+            })
+            this.onLoginSuccess({user: JSON.stringify(userResult)})
+        })
+        
+    })
+    .catch(err => {
+        this.onLoginFail('Invalid email / password combination')
+    })
   }
 
-  renderFacebookButton() {
-    return (
-      <Button
-        raised
-        title='Login with Facebook'
-        titleStyle={styles.btnText}
-        buttonStyle={styles.btnStyle}
-        // containerStyle={styles.btnContainer}
-        // onPress={()=>{this.onButtonPress()}}
-     />
-    );
-  }
-
-  //modify to enable/disable button based on state variable
   renderButton() {
-    const { emailError, passwordError, submit} = this.state;
+    const { isLoading} = this.state;
 
-    if( emailError === '' &&
-        passwordError === '' ) {
-
-
-            return (
+    if (isLoading) {
+      return(
+        <ActivityIndicator size="large" />
+      )
+    } else {
+        return (
               <Button
                 raised
                 title='Login'
                 titleStyle={styles.btnText}
                 buttonStyle={styles.btnStyle}
-                // containerStyle={styles.btnContainer}
                 onPress={()=>{this.userLogin()}}
               />
-            );
-    
-    } else if (!(emailError === '' &&
-        passwordError === '')) {
-        return (
-          <Button
-            raised
-            title='Login'
-            titleStyle={styles.btnText}
-            buttonStyle={styles.btnStyle}
-          />
-                   
-        );
-    } else {
-        return (
-          <Button
-              raised
-              title='Login'
-              titleStyle={styles.btnText}
-              buttonStyle={styles.btnStyle}
-            />
         );
     }
   }
-/*
- if(this.state.pageLoading){
-      return(
-        <View style={{flex:1, justifyContent:'center', alignItems:'center'}}>
-          <ActivityIndicator size='large' />
-        </View>
-      )
-    }
-*/
-
  
   render() {
-   
     return (
-     
       <View style={styles.Wrapper}>
-   
         <View style={styles.formContainer}>
           <View style={styles.formStyle}>
             <Input
@@ -214,9 +165,6 @@ class LoginScreen extends React.Component {
           <View style={styles.btnContainer}>
              {this.renderButton()}
           </View>
-          <View style={styles.faceBtnContainer}>
-             {this.renderFacebookButton()}
-          </View>
         
           <TouchableWithoutFeedback onPress={()=>this.props.navigation.navigate('Register')}>
             <Text style={{color:'#f1e4e4', margin:20, fontSize:14, }}>Create account?</Text>
@@ -231,7 +179,7 @@ const styles = {
   Wrapper:{
     justifyContent:'center', 
     alignItems:'center', 
-    felx:1, 
+    flex:1, 
     height:'100%', 
     backgroundColor:COLOR.primary
   },
@@ -240,13 +188,6 @@ const styles = {
       alignSelf: 'center',
       color: '#ff8484'
   }, 
-  headerStyle:{
-    height:'25%', 
-    justifyContent:'flex-start', 
-    alignItems:'center', 
-    paddingTop:30,
-    marginTop:30
-  },
   formStyle:{
     flexDirection: 'row-reverse',
     backgroundColor:'#f1e4e4',

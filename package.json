@@ -12,11 +12,14 @@
   "dependencies": {
     "AsyncStorage": "^0.1.5",
     "axios": "^0.19.0",
+    "firebase": "^7.5.0",
     "react": "16.9.0",
     "react-native": "0.61.4",
+    "react-native-dialog": "^5.6.0",
     "react-native-elements": "^1.2.7",
     "react-native-gesture-handler": "^1.5.0",
     "react-native-keyboard-spacer": "^0.4.1",
+    "react-native-modal": "^11.5.3",
     "react-native-splashscreen": "^1.0.0",
     "react-native-vector-icons": "^6.6.0",
     "react-navigation": "^3.11.1"
