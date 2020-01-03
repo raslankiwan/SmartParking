@@ -1,28 +1,25 @@
 import React from 'react'
-import { View, Text, Image, AsyncStorage, TouchableHighlight, BackHandler} from 'react-native'
-import { Button, Card } from 'react-native-elements' 
+import { View, Text, Image, Button, AsyncStorage, TouchableHighlight} from 'react-native'
+import { Card } from 'react-native-elements' 
 import Colors from '../constants/Colors'
 
 export default class HomeScreen extends React.Component {
 
-    // static navigationOptions = ({ navigation, navigationOptions }) => {
-    //     return ({
-    //       title: 'Home',
-    //       headerTitleStyle :{textAlign: 'center', flex: 1},
-    //       headerLeft:  <Button
-    //                         title ="Logout"
-    //                         onPress={async ()  =>{
-    //                             await AsyncStorage.removeItem('user')
-    //                             navigation.navigate('Login')
-    //                         }}
-    //                     />,
-    //         headerRight: null
-    //   });
-    // }
-    static navigationOptions =  ({ navigation }) => {
-        const { params } = navigation.state;
-        return params;
+    static navigationOptions = ({ navigation, navigationOptions }) => {
+        return ({
+          title: 'Home',
+          headerTitleStyle :{textAlign: 'center', flex: 1},
+          headerLeft:  <Button
+                            title ="Logout"
+                            onPress={async ()  =>{
+                                await AsyncStorage.removeItem('user')
+                                navigation.navigate('Login')
+                            }}
+                        />,
+            headerRight: null
+      });
     }
+
     constructor() {
         super()
         this.state = {
@@ -31,41 +28,18 @@ export default class HomeScreen extends React.Component {
         }
     }
 
-    componentDidMount = async () => {
-        BackHandler.addEventListener('hardwareBackPress', this.handleBackPress);
+    componentWillMount = async () => {
         let user = await AsyncStorage.getItem('user')
-        user = JSON.parse(user)
-        this.setState({user: user})
-        const { navigation } = this.props
-        navigation.setParams({
-            title: 'Home',
-            // headerRight: (
-            //     <Text style={{marginRight: 20, color: 'white'}}>{user.balance} NIS</Text>
-            // ),
-            headerLeft:  <Button
-                            type="clear"
-                            title ="Logout"
-                            titleStyle={{ color: 'red' }}
-                            onPress={async ()  =>{
-                                await AsyncStorage.removeItem('user')
-                                navigation.navigate('Login')
-                            }}
-                        />,
+        console.log(user)
+        this.setState({user: JSON.parse(user)})
+        this.props.navigation.setOptions({
+            title: 'Raslan',
+            headerRight:<Text>{user.balance}</Text>
           });
         
          // this.fetchStreets()
 
     }
-
-    componentWillUnmount() {
-        BackHandler.removeEventListener('hardwareBackPress', this.handleBackPress);
-    }
-    
-
-
-    handleBackPress = () => {
-        BackHandler.exitApp()
-      }
 
     onFetchSuccess = async (json) => {
         console.log('Success')

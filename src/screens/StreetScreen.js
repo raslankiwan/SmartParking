@@ -5,9 +5,11 @@ import Colors from '../constants/Colors'
 
 export default class StreetScreen extends React.Component {
 
-    static navigationOptions =  ({ navigation }) => {
-        const { params } = navigation.state;
-        return params;
+    static navigationOptions = ({ navigation, navigationOptions }) => {
+        return ({
+          title: navigation.getParam('name', 'Home'),
+          headerTitleStyle :{textAlign: 'center', flex: 1},
+      });
     }
 
     constructor() {
@@ -19,22 +21,10 @@ export default class StreetScreen extends React.Component {
     }
 
     async componentDidMount() {
+        console.log('st')
         let user = await AsyncStorage.getItem('user')
-        user = JSON.parse(user)
-        this.setState({user})
-        console.log('balance', user.balance)
-        const { navigation } = this.props;
-        const name = navigation.getParam('name','there is no details ')
-        this.props.navigation.setParams({
-            title: `${name} Street`, 
-            // headerRight: (
-            //     <Text style={{marginRight: 20, color: 'white'}}>{user.balance} NIS</Text>
-            // ),
-        })
+        this.setState({user: JSON.parse(user)})
     }
-
-
-    
 
     render() {
         return (

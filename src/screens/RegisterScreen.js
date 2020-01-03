@@ -1,12 +1,11 @@
 import React from 'react';
 
-import { View, Text, ScrollView, AsyncStorage, Alert } from 'react-native';
+import { View, Text, ScrollView, AsyncStorage } from 'react-native';
 import { Button, Input} from 'react-native-elements';
 import COLOR from '../constants/Colors';
 import { postRequest } from '../globals/RequestFetch'
 import {SERVER_ADDRESS} from '../constants/ServerConstants'
 import KeyboardSpacer from 'react-native-keyboard-spacer';
-import firebase from 'firebase'
 
 export default class RegisterScreen extends React.Component {
     state = {
@@ -31,7 +30,25 @@ export default class RegisterScreen extends React.Component {
 
     renderButton() {
         const { emailError, nameError, passwordError, phoneError, submit } = this.state;
-      
+        // if( emailError === '' &&
+        //     nameError === '' &&
+        //     passwordError === '' &&
+        //     phoneError === '') {
+
+        //     if(this.props.loading) {
+        //         return <Spinner size="large" />;
+        //     } else {
+        //         return (
+        //             <Button 
+        //                 title='Sign Up' 
+        //                 raised
+        //                 titleStyle={styles.btnText}
+        //                 buttonStyle={styles.btnStyle}
+        //                 onPress={this.onButtonPress.bind(this)}
+        //             />
+        //         );
+        //     }
+        // } else {
             return (
                 <Button 
                     title='Sign Up' 
@@ -42,6 +59,7 @@ export default class RegisterScreen extends React.Component {
                     onPress={this.signUp()}
                 />
             );
+        //}
     }
 
     updateEmail(email) {
@@ -83,7 +101,7 @@ export default class RegisterScreen extends React.Component {
     }
 
     updatePhone(phone) {
-        let regex = /^\d{10}$/
+        let regex = /^[0][1-9]\d{9}$|^[1-9]\d{9}$/;
         if (regex.test(phone)) {
             this.setState({ phoneError: '', phone});
         } else {
@@ -104,28 +122,15 @@ export default class RegisterScreen extends React.Component {
     }
 
     onSignupFail = () => {
-        Alert.alert('Register Error', 'Account already exists')
+        //code to display error message / popup
+        alert('Account already exists')
+        console.log('Fail')
     }
 
     signUp = () => {
         let { email, password, firstName, lastName, phone} = this.state;
-        // let url = `${SERVER_ADDRESS}/register`
-        // postRequest(url, {email, password, firstName, lastName, phone}, 'POST', this.onSignupSuccess, this.onSignupFail)
-
-        firebase.auth().createUserWithEmailAndPassword(email, password)
-        .then(user => {
-            firebase.database().ref(`users/`)
-            .push({ firstName, lastName, phone, email, balance:0, uid: user.user.uid})
-            .then(() => {
-                this.onSignupSuccess()
-            })
-            .catch(err => {
-                this.onSignupFail()
-            })
-        })
-        .catch(err => {
-            this.onSignupFail()
-        })
+        let url = `${SERVER_ADDRESS}/register`
+        postRequest(url, {email, password, firstName, lastName, phone}, 'POST', this.onSignupSuccess, this.onSignupFail)
     }
 
     enableBtn() {
