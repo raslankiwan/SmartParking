@@ -4,17 +4,7 @@
             "outputFile": "D:\\Projects\\React-Native\\SmartParking\\android\\app\\build\\intermediates\\incremental\\mergeDebugResources\\merged.dir\\values-v16\\values-v16.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\Raslan\\.gradle\\caches\\transforms-2\\files-2.1\\80d9e58c6842884134e32742150b776a\\res\\values-v16\\values-v16.xml",
-                    "from": {
-                        "startLines": "2",
-                        "startColumns": "4",
-                        "startOffsets": "55",
-                        "endColumns": "65",
-                        "endOffsets": "116"
-                    }
-                },
-                {
-                    "source": "C:\\Users\\Raslan\\.gradle\\caches\\transforms-2\\files-2.1\\4dd23978ba857007077500d17cadeb45\\res\\values-v16\\values-v16.xml",
+                    "source": "C:\\Users\\Raslan\\.gradle\\caches\\transforms-2\\files-2.1\\14c7788cf158b39f73382b65d54133ed\\res\\values-v16\\values-v16.xml",
                     "from": {
                         "startLines": "2",
                         "startColumns": "4",
@@ -30,6 +20,16 @@
                         "endLines": "6",
                         "endColumns": "12",
                         "endOffsets": "289"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\Raslan\\.gradle\\caches\\transforms-2\\files-2.1\\d099de9331edc0d433a9f8d4bff99a38\\res\\values-v16\\values-v16.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "65",
+                        "endOffsets": "116"
                     }
                 }
             ]
