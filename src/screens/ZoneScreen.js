@@ -6,6 +6,7 @@ import firebase from 'firebase'
 import COLOR from '../constants/Colors'
 import Modal from 'react-native-modal'
 import Dialog from 'react-native-dialog'
+import  Icon  from 'react-native-vector-icons/FontAwesome'
 
 export default class ZoneScreen extends React.Component {
 
@@ -173,33 +174,32 @@ export default class ZoneScreen extends React.Component {
                         {this.state.spots && this.state.spots.map((item) => {
                         // console.log('item: ', item)
                         return(
-                        displayAvailable ?
-                            !item.occupied?
+                        // displayAvailable ?
+                         ( !item.occupied || !displayAvailable ) &&
                             <View>
                                 <Card>
-                                    <Text>Name: {item.name}</Text>
-                                    <Text>Distance: {item.distance} Meters</Text>
-                                    <Text>Occupied: No</Text>
-                                    <Button title="Book" onPress={() => this.setState({showModal:true, selectedSpot: item})}/>
-                                </Card>
-                            </View> : null
-                            :
-
-                            <View>
-                                <Card>
-                                    <Text>Name: {item.name}</Text>
-                                    <Text>Distance: {item.distance} Meters</Text>
-                                    {item.occupied ?
-                                    <Text>Occupied: Yes</Text>
-                                    
-                                    :
-                                    <View>
-                                        <Text>Occupied: No</Text>
-                                        <Button title="Book" onPress={() => this.setState({showModal:true, selectedSpot: item})}/>
+                                    <View style={styles.horizontalView}>
+                                        <View style={styles.zoneDetails}>
+                                            <Text>Name: {item.name}</Text>
+                                            <Text>Distance: {item.distance} Meters</Text>
+                                            <Text>Occupied: {item.occupied ? 'Yes' : 'No' } </Text>
+                                        </View>
+                                        <View style={styles.iconStyle}>
+                                            <Icon
+                                                name="circle"
+                                                color={item.occupied ? "red" : "green"}
+                                                size={25}
+                                            />
+                                        </View>
                                     </View>
-                                }
+                                    
+                                    
+                                    {
+                                        !item.occupied && <Button title="Book" onPress={() => this.setState({showModal:true, selectedSpot: item})}/>
+                                    }
                                 </Card>
-                            </View>)
+                            </View> 
+                            )
                         })} 
                     
                         
@@ -309,4 +309,16 @@ const styles = {
         alignSelf: 'center',
         color: '#ff8484'
     }, 
+    horizontalView: {
+        flex: 1,
+        flexDirection: 'row',
+        width: '100%'
+    },
+    zoneDetails: {
+        width: '90%'
+    },
+    iconStyle: {
+        width: '10%'
+    }
+
 };
