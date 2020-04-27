@@ -2,6 +2,8 @@ import React from 'react'
 import { View, Text, Image, AsyncStorage, TouchableHighlight, BackHandler} from 'react-native'
 import { Button, Card } from 'react-native-elements' 
 import Colors from '../constants/Colors'
+import Icon from 'react-native-vector-icons/FontAwesome'
+import { TouchableWithoutFeedback } from 'react-native-gesture-handler'
 
 export default class HomeScreen extends React.Component {
 
@@ -36,13 +38,17 @@ export default class HomeScreen extends React.Component {
         let user = await AsyncStorage.getItem('user')
         user = JSON.parse(user)
         this.setState({user: user})
+        console.log('uid: ', this.state.user)
         const { navigation } = this.props
         navigation.setParams({
             title: 'Home',
-            // headerRight: (
-            //     <Text style={{marginRight: 20, color: 'white'}}>{user.balance} NIS</Text>
-            // ),
-            headerLeft:  <Button
+            headerRight: () => (
+                <TouchableWithoutFeedback 
+                    onPress={() => this.props.navigation.navigate('MyBooks')}>
+                    <Text style={{marginRight: 20, color: 'white'}}>My Books</Text>
+                </TouchableWithoutFeedback>
+            ),
+            headerLeft: () => <Button
                             type="clear"
                             title ="Logout"
                             titleStyle={{ color: 'red' }}
@@ -50,6 +56,12 @@ export default class HomeScreen extends React.Component {
                                 await AsyncStorage.removeItem('user')
                                 navigation.navigate('Login')
                             }}
+                            // icon={
+                            //     <Icon 
+                            //         name="sign-out-alt"
+                            //         size={25}
+                            //     />
+                            // }
                         />,
           });
         

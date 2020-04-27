@@ -89,12 +89,21 @@ export default class ZoneScreen extends React.Component {
     }
 
     reserveSpot(item) {
-        let { id } = this.state
+        let { id, numberOfHours } = this.state
+        let date = new Date()
         // let url = `${SERVER_ADDRESS}/reserveSpot/${id}/${item.name}`
         // postRequest(url, {}, 'POST', this.onReserveSuccess, this.onReserveFail)
         firebase.database().ref(`/zones/zone_${id}/${item.name}`)
         .update({occupied: true})
         .then(() => {
+            firebase.database().ref(`/users/${this.state.user.key}/books`)
+            .push({
+                zoneId: id,
+                slotId: item.name,
+                numberOfHours,
+                startTime: date.getTime(),
+                confirmed: false
+            })
             this.onReserveSuccess()
         })
         .catch(err => {

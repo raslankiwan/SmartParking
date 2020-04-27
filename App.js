@@ -28,7 +28,9 @@ export default class App extends React.Component {
           appId: "1:178342707522:web:86ecbbf2e5e71fc7e0c8db",
           measurementId: "G-L06Z9HX6KM"
         };
-        firebase.initializeApp(config);
+        if (firebase.apps.length === 0) {
+          firebase.initializeApp(config);
+        }
     }
 
 

@@ -1,11 +1,13 @@
 import React from 'react';
-import { createAppContainer, createStackNavigator } from 'react-navigation';
+import { createAppContainer } from 'react-navigation';
+import { createStackNavigator } from 'react-navigation-stack'
 import HomeScreen from '../screens/HomeScreen';
 import LoginScreen from '../screens/LoginScreen'
 import RegisterScreen from '../screens/RegisterScreen';
 import Colors from '../constants/Colors';
 import StreetScreen from '../screens/StreetScreen';
 import ZoneScreen from '../screens/ZoneScreen';
+import MyBooks from '../screens/MyBooks';
 
 const RootStack = createStackNavigator(
   {
@@ -24,6 +26,9 @@ const RootStack = createStackNavigator(
       Zone: {
           screen: ZoneScreen,
           //navigationOptions: () => {headerTitle: 'this is respected'}
+      },
+      MyBooks: {
+          screen: MyBooks
       }
   },
   {
@@ -37,9 +42,9 @@ const RootStack = createStackNavigator(
           headerTitleStyle: {
               fontWeight: 'bold',
           },
+          headerTitleAlign: 'center'
          
       },
-      headerLayoutPreset: 'center'
   }
 );
 
