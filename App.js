@@ -1,18 +1,9 @@
 import React from 'react';
-import {
-  SafeAreaView,
-  StyleSheet,
-  ScrollView,
-  View,
-  Text,
-  StatusBar,
-  AsyncStorge
-} from 'react-native';
-// import {SERVER_ADDRESS} from './src/constants/ServerConstants'
 
 import firebase from 'firebase'
 import AppNavigator from './src/navigation/AppNavigator';
 console.disableYellowBox = true;
+import PushNotification  from 'react-native-push-notification';
 export default class App extends React.Component {
 
 
@@ -31,6 +22,17 @@ export default class App extends React.Component {
         if (firebase.apps.length === 0) {
           firebase.initializeApp(config);
         }
+
+        
+        PushNotification.configure({
+          // (required) Called when a remote or local notification is opened or received
+          onNotification: (notification) => {
+            console.log('LOCAL NOTIFICATION ==>', notification)
+          },
+          
+          popInitialNotification: true,
+          requestPermissions: true
+        })
     }
 
 

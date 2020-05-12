@@ -1,5 +1,5 @@
 import React from 'react'
-import { View, Text, TextInput, AsyncStorage } from 'react-native'
+import { View, Text, TextInput, AsyncStorage, ActivityIndicator } from 'react-native'
 import { Card, Button, Input } from 'react-native-elements'
 import { ScrollView } from 'react-native-gesture-handler'
 import firebase from 'firebase'
@@ -7,6 +7,7 @@ import COLOR from '../constants/Colors'
 import Modal from 'react-native-modal'
 import Dialog from 'react-native-dialog'
 import  Icon  from 'react-native-vector-icons/FontAwesome'
+import { fetchZone } from '../globals/actions'
 
 export default class ZoneScreen extends React.Component {
 
@@ -24,7 +25,8 @@ export default class ZoneScreen extends React.Component {
             id: 0,
             showModal: false,
             numberOfHours: '',
-            selectedSpot: null
+            selectedSpot: null,
+            isLoading: false
         }
     }
 
@@ -45,29 +47,32 @@ export default class ZoneScreen extends React.Component {
     }
 
     fetchSpots() {
+        this.setState({isLoading: true})
         let id = this.props.navigation.getParam('id','there is no details ');
-        let spots = []
-        firebase.database().ref(`/zones/zone_${id}/`)
-        .on('value', snapshot => {
-            snapshot.forEach(child => {
-                let spot = {
-                    name: child.key,
-                    distance: child.val().distance,
-                    occupied: child.val().occupied
-                }
-                spots.push(spot)
-            })
-            this.onFetchSuccess({spots})
-        })
+        // let spots =
+        fetchZone(id, this.onFetchSuccess, this.onFetchFail)
+        // firebase.database().ref(`/zones/zone_${id}/`)
+        // .on('value', snapshot => {
+        //     snapshot.forEach(child => {
+        //         let spot = {
+        //             name: child.key,
+        //             distance: child.val().distance,
+        //             occupied: child.val().occupied
+        //         }
+        //         spots.push(spot)
+        //     })
+            
+        // })
+        // this.onFetchSuccess({spots})
     }
 
     onFetchSuccess = (json) => {
         let spots = json.spots
-        this.setState({spots: spots})
+        this.setState({spots: spots, isLoading: false})
     }
     
     onFetchFail() {
-        
+        this.setState({isLoading: false})
     }
 
     onReserveClick() {
@@ -145,9 +150,11 @@ export default class ZoneScreen extends React.Component {
     }
 
     render() {
-        let {displayAvailable, id} = this.state
+        let {displayAvailable, id, isLoading} = this.state
         let imgUrl = '../../assets/Images/Jaffa/'+id+'.jpg'
         return(
+            isLoading ? <ActivityIndicator size="large" color="white" />
+            :
             <ScrollView >
                 <View>
                     <View>
@@ -180,36 +187,39 @@ export default class ZoneScreen extends React.Component {
                             </View>
                             
                         </View>
-                        {this.state.spots && this.state.spots.map((item) => {
-                        // console.log('item: ', item)
-                        return(
-                        // displayAvailable ?
-                         ( !item.occupied || !displayAvailable ) &&
-                            <View>
-                                <Card>
-                                    <View style={styles.horizontalView}>
-                                        <View style={styles.zoneDetails}>
-                                            <Text>Name: {item.name}</Text>
-                                            <Text>Distance: {item.distance} Meters</Text>
-                                            <Text>Occupied: {item.occupied ? 'Yes' : 'No' } </Text>
+
+                        {
+                            this.state.spots && this.state.spots.map((item) => {
+                            // console.log('item: ', item)
+                            return(
+                            // displayAvailable ?
+                            ( !item.occupied || !displayAvailable ) &&
+                                <View>
+                                    <Card>
+                                        <View style={styles.horizontalView}>
+                                            <View style={styles.zoneDetails}>
+                                                <Text>Name: {item.name}</Text>
+                                                <Text>Distance: {item.distance} Meters</Text>
+                                                <Text>Occupied: {item.occupied ? 'Yes' : 'No' } </Text>
+                                            </View>
+                                            <View style={styles.iconStyle}>
+                                                <Icon
+                                                    name="circle"
+                                                    color={item.occupied ? "red" : "green"}
+                                                    size={25}
+                                                />
+                                            </View>
                                         </View>
-                                        <View style={styles.iconStyle}>
-                                            <Icon
-                                                name="circle"
-                                                color={item.occupied ? "red" : "green"}
-                                                size={25}
-                                            />
-                                        </View>
-                                    </View>
-                                    
-                                    
-                                    {
-                                        !item.occupied && <Button title="Book" onPress={() => this.setState({showModal:true, selectedSpot: item})}/>
-                                    }
-                                </Card>
-                            </View> 
-                            )
-                        })} 
+                                        
+                                        
+                                        {
+                                            !item.occupied && <Button title="Book" onPress={() => this.setState({showModal:true, selectedSpot: item})}/>
+                                        }
+                                    </Card>
+                                </View> 
+                                )
+                            })
+                        } 
                     
                         
                     </View>

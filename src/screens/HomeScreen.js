@@ -4,6 +4,7 @@ import { Button, Card } from 'react-native-elements'
 import Colors from '../constants/Colors'
 import Icon from 'react-native-vector-icons/FontAwesome'
 import { TouchableWithoutFeedback } from 'react-native-gesture-handler'
+import firebase from 'firebase'
 
 export default class HomeScreen extends React.Component {
 
@@ -37,8 +38,16 @@ export default class HomeScreen extends React.Component {
         BackHandler.addEventListener('hardwareBackPress', this.handleBackPress);
         let user = await AsyncStorage.getItem('user')
         user = JSON.parse(user)
+        if (user.balance === 0) {
+            firebase.database().ref(`/users/${user.key}`)
+            .on('value', async (snapshot) => {
+                user.balance = snapshot.val().balance
+                this.setState({user})
+            })
+        }
+        await AsyncStorage.setItem('user', JSON.stringify(user))
+
         this.setState({user: user})
-        console.log('uid: ', this.state.user)
         const { navigation } = this.props
         navigation.setParams({
             title: 'Home',
@@ -56,16 +65,9 @@ export default class HomeScreen extends React.Component {
                                 await AsyncStorage.removeItem('user')
                                 navigation.navigate('Login')
                             }}
-                            // icon={
-                            //     <Icon 
-                            //         name="sign-out-alt"
-                            //         size={25}
-                            //     />
-                            // }
                         />,
           });
         
-         // this.fetchStreets()
 
     }
 
