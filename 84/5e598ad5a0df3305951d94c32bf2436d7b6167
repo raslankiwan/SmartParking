@@ -1,0 +1,51 @@
+README.md
+  s_729c159b785784::t_0ae41b72b7c717 28-33,37-48,61,91,103-121
+apps/admin/src/main.tsx
+  s_729c159b785784::t_2f3684458b3f41 1-7,70-71,77,79-89,95-98,168-170,263-274,276-278,280-294,297-300,304,308,311-313,352-353,360-369,397-410,473-489,523-539,591-631,648,670,682-687,702-705,707-709,712-717,720-722,724-731,751,777-778,819,833,835,847,908-910,915-921,1030-1034,1044,1050,1160-1166,1202,1210-1211,1246,1256,1265-1269,1375-1378,1380,1382-1386,1406-1410,1416,1418,1441,1445,1451-1480,1482-1534,1540,1542,1552,1554,1574,1581-1582,1713,1787,1821-1848
+apps/admin/src/style.css
+  s_729c159b785784::t_7ff196e8cd41b9 1590-1680
+apps/api/src/app.ts
+  s_729c159b785784::t_ec5340d71bdde0 1-5,79-116,217,223-234,236-237,240-268,314-315,345-352,358-362,370,375-376,387,431-440,447,504-506,510-511,533,548,550-551,563,573,605,608,615-619,634,650-654,667-676,680-682,694-698,704-721,733-740
+apps/api/src/auth.ts
+  s_729c159b785784::t_c7bc199c277f88 1,40,50-53,58-62,93-96
+apps/api/src/db.ts
+  s_729c159b785784::t_71a27d95d8b566 23-40
+apps/api/test/integration.test.ts
+  s_729c159b785784::t_41074c5efb4245 34-46,473-659
+apps/mobile/src/screens/HomeScreen.js
+  s_729c159b785784::t_6831c228a27cc1 5,8,43-54,61-102,104-105
+apps/mobile/src/screens/MyBooks.js
+  s_729c159b785784::t_5991a8ce999fc2 58-64,66-70
+apps/mobile/src/screens/StreetScreen.js
+  s_729c159b785784::t_dc9d9dcf479a46 41-43,52-53
+apps/mobile/src/screens/ZoneScreen.js
+  s_729c159b785784::t_0eba3d0fb07cc0 62-64
+package-lock.json
+  s_729c159b785784::t_c7f3ec939a2c84 1666-1671,2237-2248,3601-3604
+package.json
+  s_729c159b785784::t_f0a8ab1468172b 16-17
+packages/contracts/package.json
+  s_729c159b785784::t_49f61b7da2c0b8 1
+packages/contracts/src/index.ts
+  s_729c159b785784::t_6329ec6b5202ee 1,9-10,18-22,58-62
+packages/contracts/src/localization.ts
+  s_729c159b785784::t_94228c4df4dabf 1-19
+scripts/seed.ts
+  s_729c159b785784::t_d6e6ce1d5656f5 5-11,21-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "845e598ad5a0df3305951d94c32bf2436d7b6167",
+  "prompts": {},
+  "sessions": {
+    "s_729c159b785784": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a158e6-ae90-7a33-8bc5-2ef83f033ccb",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "raslan <raslankiwan@gmail.com>"
+    }
+  }
+}
