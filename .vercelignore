@@ -1,0 +1,7 @@
+.git
+node_modules
+apps/mobile
+.env*
+!.env.example
+coverage
+*.log
