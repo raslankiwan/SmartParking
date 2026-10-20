@@ -12,3 +12,5 @@ coverage/
 **/ios/Pods/
 **/ios/build/
 **/*.xcuserstate
+
+packages/*/dist/

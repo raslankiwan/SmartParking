@@ -8,13 +8,14 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently -k 'npm run dev -w @smartparking/api' 'npm run dev -w @smartparking/admin'",
-    "build": "npm run typecheck && npm run build -w @smartparking/admin",
+    "dev": "npm run build:contracts && concurrently -k 'npm run dev -w @smartparking/api' 'npm run dev -w @smartparking/admin'",
+    "build": "npm run build:contracts && npm run typecheck && npm run build -w @smartparking/admin",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test apps/api/test/*.test.ts",
+    "test": "npm run build:contracts && tsx --test apps/api/test/*.test.ts",
     "db:seed": "tsx --env-file=.env.local scripts/seed.ts",
     "admin:promote": "tsx --env-file=.env.local scripts/promote-admin.ts",
-    "db:demo": "tsx --env-file=.env.local scripts/seed.ts --demo"
+    "db:demo": "tsx --env-file=.env.local scripts/seed.ts --demo",
+    "build:contracts": "npm run build -w @smartparking/contracts"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.9",
