@@ -1,0 +1,25 @@
+.gitignore
+  s_729c159b785784::t_15421cb20f1cf1 15-16
+package.json
+  s_729c159b785784::t_712945a9dcd445 11-12,14,17-18
+packages/contracts/package.json
+  s_729c159b785784::t_86b7b09c98e746 1-16
+packages/contracts/tsconfig.build.json
+  s_729c159b785784::t_8ac4b59ddae85b 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "ff1a86e99398508bf10f453ef7b1353f37df3ec8",
+  "prompts": {},
+  "sessions": {
+    "s_729c159b785784": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a158e6-ae90-7a33-8bc5-2ef83f033ccb",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "raslan <raslankiwan@gmail.com>"
+    }
+  }
+}
