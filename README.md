@@ -21,6 +21,19 @@ Production portal: https://smartparking-weld.vercel.app — API health: https://
 
 The migration preserves the native source under `apps/mobile`, removes tracked Android build/Gradle cache output, and retains the original Jaffa map. Existing Git branches and history are preserved.
 
+## Original ParkingServer audit
+
+The companion [ParkingServer repository](https://github.com/raslankiwan/ParkingServer) was reviewed at commit `f0d2309`. It contains four Express/Firebase endpoints, no database export or seed inventory, and seven Jaffa images that are byte-for-byte identical to the assets preserved in `apps/mobile`. Registration starts accounts with zero credit, matching the new backend. No additional behavior or unique assets needed importing.
+
+| Old server route | Monorepo replacement |
+| --- | --- |
+| `POST /auth` | `POST /api/auth/login` |
+| `POST /register` | `POST /api/auth/register` |
+| `POST /fetchZones/:id` | `GET /api/zones?streetId=UUID` and `GET /api/spots?zoneId=UUID` |
+| `POST /reserveSpot/:zoneId/:spotName` | `POST /api/reservations` with `{spotId,vehiclePlate,hours}` |
+
+The original reservation route directly set physical occupancy without authentication, ownership, billing, or booking history. Its replacement authenticates the driver and atomically records the reservation, credit debit and space lock while retaining physical occupancy as a separate field. The updated clients use the new API contract; old endpoint URLs and serialized-user responses are not compatibility interfaces. Historical Firebase data was not accessed or migrated because the repository contains no data export. ParkingServer is archived with a pointer to this monorepo, preserving its Git history as a reference.
+
 ## Local development
 
 Use Node 24 and npm. The maintained workspace includes API, web portal and shared contracts. The legacy native app installs independently to keep its React 16 / Metro toolchain isolated from React 19.
