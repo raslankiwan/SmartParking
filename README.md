@@ -1,0 +1,152 @@
+# SmartParking
+
+A parking monorepo with a React Native client, a responsive operations/driver portal, and a MongoDB-backed API deployed together on Vercel.
+
+## Applications
+
+| Path                 | Purpose                                                                      |
+| -------------------- | ---------------------------------------------------------------------------- |
+| `apps/mobile`        | Original React Native 0.61 iOS/Android application, connected to the new API |
+| `apps/admin`         | React + Vite administrator workspace and driver web portal                   |
+| `apps/api`           | Express 5 + TypeScript API, authentication and transactional bookings        |
+| `packages/contracts` | Shared API domain types                                                      |
+| `api/index.ts`       | Vercel serverless entry point                                                |
+| `scripts`            | Idempotent seed, admin invitation and role management                        |
+
+Production portal: https://smartparking-weld.vercel.app — API health: https://smartparking-weld.vercel.app/api/health
+
+## Requirements recovered from the old project
+
+`master` contains account registration/login, Jaffa Street, six zones at distances 0, 280, 440, 680, 900 and 1050 meters, occupancy/distance display, and an unfinished Book button. The newer `R2` branch adds Firebase-backed prepaid balances, hourly reservations at 2 NIS/hour, arrival confirmation, renewal and booking history. Those flows now run through the server and MongoDB; clients cannot directly mutate balances or bookings.
+
+The migration preserves the native source under `apps/mobile`, removes tracked Android build/Gradle cache output, and retains the original Jaffa map. Existing Git branches and history are preserved.
+
+## Original ParkingServer audit
+
+The companion [ParkingServer repository](https://github.com/raslankiwan/ParkingServer) was reviewed at commit `f0d2309`. It contains four Express/Firebase endpoints, no database export or seed inventory, and seven Jaffa images that are byte-for-byte identical to the assets preserved in `apps/mobile`. Registration starts accounts with zero credit, matching the new backend. No additional behavior or unique assets needed importing.
+
+| Old server route                      | Monorepo replacement                                            |
+| ------------------------------------- | --------------------------------------------------------------- |
+| `POST /auth`                          | `POST /api/auth/login`                                          |
+| `POST /register`                      | `POST /api/auth/register`                                       |
+| `POST /fetchZones/:id`                | `GET /api/zones?streetId=UUID` and `GET /api/spots?zoneId=UUID` |
+| `POST /reserveSpot/:zoneId/:spotName` | `POST /api/reservations` with `{spotId,vehiclePlate,hours}`     |
+
+The original reservation route directly set physical occupancy without authentication, ownership, billing, or booking history. Its replacement authenticates the driver and atomically records the reservation, credit debit and space lock while retaining physical occupancy as a separate field. The updated clients use the new API contract; old endpoint URLs and serialized-user responses are not compatibility interfaces. Historical Firebase data was not accessed or migrated because the repository contains no data export. ParkingServer is archived with a pointer to this monorepo, preserving its Git history as a reference.
+
+## Global locations and currencies
+
+The application supports cities and streets worldwide. Create a street under **Streets & zones**, specifying its city, country, ISO currency and IANA time zone, then add any number of zones and spaces. A city appears in the country/city selectors as soon as its first street exists. City identity includes country: matching city and street names in different countries remain distinct. Names support Unicode, including non-Latin scripts. Optional latitude/longitude and an image URL describe each street without tying it to a map provider.
+
+The web portal filters by country → city → street → zone, searches location names, and builds its featured location and availability panels from actual data. The native app searches cities/countries/streets and carries each street's monetary settings through booking screens. Display follows the browser's locale; the interface copy remains English. Web booking times use the snapshotted street time zone; the legacy native client shows unambiguous UTC timestamps plus the street's zone identifier.
+
+Each currency has a separate prepaid wallet. There is **no foreign-exchange conversion**: USD credit cannot pay for JPY parking. Credits, debits and refunds use integer minor units, with the currency's actual decimal precision (for example JPY=0, USD=2, KWD=3). The historical field names `amountCents`/`paidCents` mean minor units for the accompanying `currency`. `balanceCents` remains the legacy ILS wallet; the API exposes `balances` and `balanceDigits` for every wallet. Street currency is fixed at creation. Rates, currency, location and time zone are snapshotted on reservations, so later location/rate edits do not rewrite booking history or renewal pricing.
+
+Existing records remain usable: missing currencies are interpreted as ILS and missing time zones as UTC. Existing physical locations are never guessed from street names. Index setup adds the missing legacy country field and replaces the old city/street uniqueness index with country/city/street uniqueness. Balances and booking amounts are never converted or reset.
+
+Normal setup creates indexes only: `npm run db:seed` does **not** add any city or parking inventory. `npm run db:demo` explicitly adds the historical Jaffa sample (six zones, 48 spaces) without resetting existing data. Previously seeded sample records remain available and can be archived through the admin portal. New installations start ready for their own locations.
+
+## Local development
+
+Use Node 24 and npm. The maintained workspace includes API, web portal and shared contracts. The legacy native app installs independently to keep its React 16 / Metro toolchain isolated from React 19.
+
+```sh
+npm ci
+cp .env.example .env.local
+# Configure MONGODB_URI, MONGODB_DB and APP_ORIGIN in .env.local.
+npm run db:seed
+npm run dev
+```
+
+Open http://127.0.0.1:5173. The API listens on 127.0.0.1:3001 and Vite proxies `/api`. MongoDB **must support transactions**: use Atlas or a local replica set. Normal seeding initializes indexes only. The optional `npm run db:demo` adds the historical Jaffa example with city “Unspecified”, six zones and **48 sample spaces**, initially available. Sample inventory does not represent live sensors and never resets existing records. Set `MONGODB_DB=smartparking_development` for an isolated local database.
+
+```sh
+npm test       # Real MongoDB replica-set integration tests in an isolated temporary DB
+npm run build  # Type-check the API/portal/contracts/scripts and produce the portal bundle
+```
+
+The test runner downloads a MongoDB binary on first use. MongoDB is stopped and removed after tests. No production database is used by the tests.
+
+## Accounts and administrators
+
+Drivers can create accounts through the portal or native app. New accounts start with zero parking credit. An administrator adds credit with a required audit reason under **Drivers & credits**. This is an internal prepaid ledger; **no payment gateway or real payment collection is implemented**.
+
+The initial administrator receives a private, email-bound setup link valid for 48 hours. The account remains reserved until that invitation is used; opening the link clears the token from browser history. The user chooses a password, and consuming the invitation and creating the account happen atomically. Never commit setup links or passwords.
+
+Operators with database access can issue an invitation:
+
+```sh
+npx tsx --env-file=.env.local scripts/invite-admin.ts email@example.com https://smartparking-weld.vercel.app /absolute/private/setup.md
+```
+
+Or grant an existing registered account administrator access:
+
+```sh
+npm run admin:promote -- email@example.com
+```
+
+## Booking rules
+
+- Reservations start immediately, for 1–24 integer hours. Each driver and each spot can have one active reservation.
+- The zone rate is snapshotted at booking. Balances use integer minor units in separate currency wallets. Booking, renewal, reservation locks and ledger entries share MongoDB transactions.
+- Insufficient credit, occupied/archived spaces, and disabled streets/zones reject new bookings. Failed bookings do not charge the driver.
+- Drivers confirm arrival, renew by 1–24 hours (up to 168 total), finish, or cancel their own reservations. Administrators can end any active reservation.
+- Cancelling **before** arrival confirmation refunds the entire prepaid amount once. Confirmed or expired time is non-refundable. Physical occupancy is independent of a reservation; ending one does not falsely mark a physically occupied space free.
+- Expired reservations complete and release their lock on availability/reservation reads, new bookings, renewals, confirmation and admin overview refresh. There is no scheduler dependency. The UI refreshes every 15 seconds; there are no push notifications or guaranteed background reminders.
+- Streets, zones and spaces can be archived/restored. Existing reservations can still be completed. A reserved space cannot be archived; it can still have its physical occupancy corrected.
+- Occupancy is manual admin input. Hardware/sensor ingestion, automatic alternative allocation, email verification/password reset, card payments and native notifications are not implemented.
+
+## API
+
+All endpoints return `{status:"success", ...}` or `{status:"failed", error}`. Authentication is required except register/login. Browser sessions use an HttpOnly, SameSite=Lax cookie (Secure in production). Native clients send the returned token as `Authorization: Bearer <token>`. Sessions expire after 7 days and are revoked on logout. Passwords use salted scrypt; only session-token hashes are stored. JSON-only mutation requests and an explicit `APP_ORIGIN` check protect cookie requests. Login/registration attempts are throttled per normalized email using database counters (20 per 15-minute bucket).
+
+| Method     | Route                                 | Behavior                                                |
+| ---------- | ------------------------------------- | ------------------------------------------------------- |
+| GET        | `/api/health`                         | Service and MongoDB readiness                           |
+| POST       | `/api/auth/register`                  | Create driver or consume a valid admin invitation       |
+| POST       | `/api/auth/login`, `/api/auth/logout` | Start/revoke session                                    |
+| GET        | `/api/auth/me`                        | Current user and credit balance                         |
+| GET        | `/api/cities`                         | Countries/cities derived from enabled streets           |
+| GET        | `/api/streets`                        | Enabled streets                                         |
+| GET        | `/api/zones?streetId=UUID`            | Enabled zones                                           |
+| GET        | `/api/spots?zoneId=UUID`              | Enabled spaces and availability                         |
+| GET/POST   | `/api/reservations`                   | Own history / create `{spotId,vehiclePlate,hours}`      |
+| POST       | `/api/reservations/:id/confirm`       | Confirm arrival                                         |
+| POST       | `/api/reservations/:id/renew`         | Extend with `{hours}`                                   |
+| POST       | `/api/reservations/:id/end`           | End with `{status:"completed"\|"cancelled"}`            |
+| GET        | `/api/admin/overview`                 | Admin network, drivers and reservation history          |
+| POST/PATCH | `/api/admin/streets[/:id]`            | Create/update/archive streets                           |
+| POST/PATCH | `/api/admin/zones[/:id]`              | Create/update/archive zones and rates                   |
+| POST/PATCH | `/api/admin/spots[/:id]`              | Create/update/archive spots and occupancy               |
+| POST       | `/api/admin/users/:id/credit`         | Add `{amountCents,currency,reason}` to the audit ledger |
+
+History is limited to the latest 100 reservations per driver. Admin overview is capped at 1,000 records per collection; this starter is intended for a small parking network. Add pagination before expanding beyond this capacity. Roles are enforced on the server. Parent IDs cannot change after creation, preserving historical relationships.
+
+## MongoDB collections
+
+`users`, `sessions`, `authAttempts`, `streets`, `zones`, `spots`, `reservations`, `ledger`, `invitations`. Unique partial indexes on active reservation `spotId` and `userId` prevent double bookings. Session and throttle expiry use TTL indexes; reservation history is never TTL-deleted. Pool size is limited to 5 per Vercel instance. Index creation is idempotent and runs before API traffic and seeding.
+
+## Native client
+
+```sh
+cd apps/mobile
+npm ci
+# iOS: install pods with the legacy project's supported Ruby/Xcode setup.
+npm start
+```
+
+Configure `src/constants/ServerConstants.js` for your deployment. Screens now load streets/zones/spaces from the API, authenticate, book with credits, show history, confirm arrival, renew and cancel. The original React Native 0.61 toolchain is retained rather than silently upgrading platform projects. Its dependencies are legacy, and native binaries have not been built or simulator-tested during this migration. Existing AsyncStorage-based session persistence is retained; migrate tokens to Keychain/Keystore and upgrade React Native before distributing a new native release. API/portal tests do not certify the native toolchain. No simulator or emulator is launched.
+
+## Vercel deployment
+
+The single Vercel project serves the portal and `/api` under the same origin. `vercel.json` bundles the API as one function and builds `apps/admin/dist`. `.vercelignore` excludes native source and local secrets from deployment uploads.
+
+Required environment variables: `MONGODB_URI` (Atlas integration), optional `MONGODB_DB` (defaults to `smartparking`), and `APP_ORIGIN` (exact portal origin). The deployed configuration isolates `smartparking`, `smartparking_preview`, and `smartparking_development` databases on the same Atlas cluster. Seed a nonproduction database explicitly before testing its parking UI. Preview cookie requests accept that deployment’s exact Vercel URL; custom preview domains must be added through `APP_ORIGIN`.
+
+```sh
+vercel link --project smartparking --scope YOUR_TEAM
+vercel env pull .env.local --environment development --scope YOUR_TEAM
+vercel deploy --prod --scope YOUR_TEAM
+```
+
+Atlas was provisioned on the FREE tier in Frankfurt through the existing Vercel Marketplace integration. Git-triggered production deployment should be enabled only after the monorepo branch is reviewed and merged. Until then production is deployed explicitly from this branch. Local `.env*`, `.vercel` state and setup links stay untracked.

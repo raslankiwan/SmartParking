@@ -1,37 +1,37 @@
 {
-  "name": "SmartParking",
-  "version": "0.0.1",
+  "name": "smartparking-monorepo",
   "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/api",
+    "apps/admin",
+    "packages/*"
+  ],
   "scripts": {
-    "android": "react-native run-android",
-    "ios": "react-native run-ios",
-    "start": "react-native start",
-    "test": "jest",
-    "lint": "eslint ."
-  },
-  "dependencies": {
-    "AsyncStorage": "^0.1.5",
-    "axios": "^0.19.0",
-    "react": "16.9.0",
-    "react-native": "0.61.4",
-    "react-native-elements": "^1.2.7",
-    "react-native-gesture-handler": "^1.5.0",
-    "react-native-keyboard-spacer": "^0.4.1",
-    "react-native-splashscreen": "^1.0.0",
-    "react-native-vector-icons": "^6.6.0",
-    "react-navigation": "^3.11.1"
+    "dev": "npm run build:contracts && concurrently -k 'npm run dev -w @smartparking/api' 'npm run dev -w @smartparking/admin'",
+    "build": "npm run build:contracts && npm run typecheck && npm run build -w @smartparking/admin",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build:contracts && tsx --test apps/api/test/*.test.ts",
+    "db:seed": "tsx --env-file=.env.local scripts/seed.ts",
+    "admin:promote": "tsx --env-file=.env.local scripts/promote-admin.ts",
+    "db:demo": "tsx --env-file=.env.local scripts/seed.ts --demo",
+    "build:contracts": "npm run build -w @smartparking/contracts"
   },
   "devDependencies": {
-    "@babel/core": "7.7.2",
-    "@babel/runtime": "7.7.2",
-    "@react-native-community/eslint-config": "0.0.5",
-    "babel-jest": "24.9.0",
-    "eslint": "6.6.0",
-    "jest": "24.9.0",
-    "metro-react-native-babel-preset": "0.56.3",
-    "react-test-renderer": "16.9.0"
+    "@types/cookie-parser": "^1.4.9",
+    "@types/express": "^5.0.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/supertest": "^6.0.0",
+    "concurrently": "^9.0.0",
+    "mongodb-memory-server": "^10.2.0",
+    "supertest": "^7.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
   },
-  "jest": {
-    "preset": "react-native"
-  }
+  "engines": {
+    "node": "24.x"
+  },
+  "type": "module"
 }
