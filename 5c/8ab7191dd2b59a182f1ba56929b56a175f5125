@@ -1,0 +1,19 @@
+README.md
+  s_729c159b785784::t_21947ea4d27beb 24-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "5c8ab7191dd2b59a182f1ba56929b56a175f5125",
+  "prompts": {},
+  "sessions": {
+    "s_729c159b785784": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a158e6-ae90-7a33-8bc5-2ef83f033ccb",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "raslan <raslankiwan@gmail.com>"
+    }
+  }
+}
