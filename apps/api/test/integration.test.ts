@@ -31,6 +31,19 @@ before(async () => {
   process.env.MONGODB_URI = repl.getUri();
   process.env.MONGODB_DB = "smartparking_test";
   process.env.APP_ORIGIN = "http://localhost:5173";
+  const legacyDb = await db();
+  await legacyDb
+    .collection("streets")
+    .insertOne({
+      id: "legacy-fixture",
+      name: "Legacy Road",
+      city: "Legacy City",
+      enabled: true,
+      image: "",
+    });
+  await legacyDb
+    .collection("streets")
+    .createIndex({ city: 1, name: 1 }, { unique: true });
   await indexes();
   const admin = await register("admin@example.test");
   await (await db())
@@ -456,4 +469,191 @@ test("one driver cannot reserve two spaces or renew another driver booking", asy
     ).status,
     200,
   );
+});
+
+test("international locations validate metadata and distinguish matching street/city names by country", async () => {
+  const create = (body: object) =>
+    request(app).post("/api/admin/streets").set(auth(adminToken)).send(body);
+  const base = {
+    name: "Main Street",
+    city: "Springfield",
+    currency: "USD",
+    timeZone: "America/New_York",
+    countryCode: "US",
+  };
+  const first = await create(base);
+  assert.equal(first.status, 201, first.text);
+  const second = await create({
+    ...base,
+    countryCode: "GB",
+    currency: "GBP",
+    timeZone: "Europe/London",
+  });
+  assert.equal(second.status, 201, second.text);
+  assert.equal((await create(base)).status, 409);
+  assert.equal(
+    (await create({ ...base, name: "Invalid", currency: "FAKE" })).status,
+    400,
+  );
+  assert.equal(
+    (await create({ ...base, name: "Invalid", timeZone: "Moon/Sea" })).status,
+    400,
+  );
+  assert.equal(
+    (await create({ ...base, name: "Invalid", latitude: 15 })).status,
+    400,
+  );
+  assert.equal(
+    (await create({ ...base, name: "Invalid", countryCode: "XX" })).status,
+    400,
+  );
+  const unicode = await create({
+    name: "شارع الاستقلال",
+    city: "الخليل",
+    countryCode: "PS",
+    currency: "ILS",
+    timeZone: "Asia/Hebron",
+    latitude: 31.53,
+    longitude: 35.1,
+  });
+  assert.equal(unicode.status, 201, unicode.text);
+  const filtered = await request(app)
+    .get("/api/streets?city=Springfield&countryCode=GB")
+    .set(auth(a));
+  assert.equal(filtered.status, 200);
+  assert.equal(filtered.body.streets.length, 1);
+  assert.equal(filtered.body.streets[0].currency, "GBP");
+  const cities = await request(app).get("/api/cities").set(auth(a));
+  assert.equal(cities.status, 200);
+  assert.equal(
+    cities.body.cities.filter((c: any) => c.name === "Springfield").length,
+    2,
+  );
+  assert.equal(
+    (
+      await request(app)
+        .patch(`/api/admin/streets/${first.body.item.id}`)
+        .set(auth(adminToken))
+        .send({ currency: "EUR" })
+    ).status,
+    409,
+  );
+});
+
+test("currency wallets, precision, snapshots, renewals and refunds never mix funds", async () => {
+  const d = await db();
+  for (const [currency, rate, amount, digits] of [
+    ["USD", 2.5, 1000, 2],
+    ["JPY", 300, 1000, 0],
+    ["KWD", 0.125, 1000, 3],
+  ] as const) {
+    const street = await request(app)
+      .post("/api/admin/streets")
+      .set(auth(adminToken))
+      .send({
+        name: `International ${currency}`,
+        city: "Global Test",
+        countryCode: "US",
+        currency,
+        timeZone: "Pacific/Auckland",
+      });
+    assert.equal(street.status, 201, street.text);
+    const zone = await request(app)
+      .post("/api/admin/zones")
+      .set(auth(adminToken))
+      .send({
+        streetId: street.body.item.id,
+        name: "Zone A",
+        distance: 0,
+        hourlyRate: rate,
+      });
+    assert.equal(zone.status, 201, zone.text);
+    const invalidRate = rate + 10 ** -(digits + 1);
+    assert.equal(
+      (
+        await request(app)
+          .patch(`/api/admin/zones/${zone.body.item.id}`)
+          .set(auth(adminToken))
+          .send({ hourlyRate: invalidRate })
+      ).status,
+      400,
+    );
+    const spot = await request(app)
+      .post("/api/admin/spots")
+      .set(auth(adminToken))
+      .send({ zoneId: zone.body.item.id, name: "A-01", distance: 10 });
+    assert.equal(spot.status, 201, spot.text);
+    const book = () =>
+      request(app).post("/api/reservations").set(auth(a)).send({
+        spotId: spot.body.item.id,
+        hours: 1,
+        vehiclePlate: "GLOBAL-1",
+      });
+    const ilsBefore = (await d.collection("users").findOne({ id: aId }))!
+      .balanceCents;
+    assert.equal(
+      (await book()).status,
+      409,
+      "ILS cannot pay for another currency",
+    );
+    const credit = await request(app)
+      .post(`/api/admin/users/${aId}/credit`)
+      .set(auth(adminToken))
+      .send({ amountCents: amount, currency, reason: "International fixture" });
+    assert.equal(credit.status, 200);
+    const booked = await book();
+    assert.equal(booked.status, 201, booked.text);
+    const r = booked.body.reservation;
+    assert.equal(r.currency, currency);
+    assert.equal(r.timeZone, "Pacific/Auckland");
+    assert.equal(r.paidCents, Math.round(rate * 10 ** digits));
+    await request(app)
+      .patch(`/api/admin/zones/${zone.body.item.id}`)
+      .set(auth(adminToken))
+      .send({ hourlyRate: rate * 2 });
+    await request(app)
+      .patch(`/api/admin/streets/${street.body.item.id}`)
+      .set(auth(adminToken))
+      .send({ timeZone: "UTC" });
+    const renewed = await request(app)
+      .post(`/api/reservations/${r.id}/renew`)
+      .set(auth(a))
+      .send({ hours: 1 });
+    assert.equal(renewed.status, 200, renewed.text);
+    const saved = await d.collection("reservations").findOne({ id: r.id });
+    assert.equal(saved!.paidCents, r.paidCents * 2);
+    assert.equal(saved!.timeZone, "Pacific/Auckland");
+    const cancelled = await request(app)
+      .post(`/api/reservations/${r.id}/end`)
+      .set(auth(a))
+      .send({ status: "cancelled" });
+    assert.equal(cancelled.status, 200, cancelled.text);
+    const me = await request(app).get("/api/auth/me").set(auth(a));
+    assert.equal(me.body.user.balances[currency], amount);
+    assert.equal(me.body.user.balanceCents, ilsBefore);
+    assert.equal(
+      await d
+        .collection("ledger")
+        .countDocuments({ reservationId: r.id, currency }),
+      3,
+    );
+  }
+});
+
+test("legacy location migration preserves data and installs country-scoped uniqueness", async () => {
+  const d = await db();
+  const street = await d
+    .collection("streets")
+    .findOne({ id: "legacy-fixture" });
+  assert.equal(street!.countryCode, "");
+  assert.equal(street!.name, "Legacy Road");
+  const indexes = await d.collection("streets").listIndexes().toArray();
+  assert.ok(indexes.some((i) => i.name === "countryCode_1_city_1_name_1"));
+  assert.ok(!indexes.some((i) => i.name === "city_1_name_1"));
+  const response = await request(app)
+    .get("/api/streets?city=Legacy%20City")
+    .set(auth(a));
+  assert.equal(response.status, 200);
+  assert.equal(response.body.streets[0].currency, "ILS");
+  assert.equal(response.body.streets[0].timeZone, "UTC");
 });

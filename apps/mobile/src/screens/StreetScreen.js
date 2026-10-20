@@ -38,7 +38,9 @@ export default class StreetScreen extends React.Component {
           <View style={styles.card} key={z.id}>
             <Text style={styles.name}>{z.name}</Text>
             <Text style={styles.text}>
-              {z.distance} meters · ₪{z.hourlyRate}/hour
+              {z.distance} meters ·{' '}
+              {this.props.navigation.getParam('currency', 'ILS')} {z.hourlyRate}
+              /hour
             </Text>
             <Button
               title="View spaces"
@@ -47,6 +49,8 @@ export default class StreetScreen extends React.Component {
                   id: z.id,
                   name: z.name,
                   hourlyRate: z.hourlyRate,
+                  currency: this.props.navigation.getParam('currency', 'ILS'),
+                  timeZone: this.props.navigation.getParam('timeZone', 'UTC'),
                 })
               }
             />

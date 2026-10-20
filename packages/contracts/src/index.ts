@@ -1,3 +1,4 @@
+export * from "./localization.js";
 export interface User {
   id: string;
   email: string;
@@ -5,6 +6,8 @@ export interface User {
   lastName: string;
   phone: string;
   balanceCents: number;
+  balances: Record<string, number>;
+  balanceDigits: Record<string, number>;
   role: "driver" | "admin";
   createdAt: Date | string;
 }
@@ -12,6 +15,11 @@ export interface Street {
   id: string;
   name: string;
   city: string;
+  countryCode: string;
+  currency: string;
+  timeZone: string;
+  latitude?: number;
+  longitude?: number;
   image: string;
   enabled: boolean;
 }
@@ -47,4 +55,9 @@ export interface Reservation {
   confirmed: boolean;
   expiresAt: Date | string;
   paidCents: number;
+  currency: string;
+  timeZone: string;
+  streetName?: string;
+  city?: string;
+  countryCode?: string;
 }

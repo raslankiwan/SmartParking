@@ -1,1 +1,1 @@
-{"name":"@smartparking/contracts","version":"1.0.0","private":true,"type":"module","exports":"./src/index.ts"}
+{"name":"@smartparking/contracts","version":"1.0.0","private":true,"type":"module","exports":"./src/index.ts","dependencies":{"i18n-iso-countries":"^7.14.0"}}

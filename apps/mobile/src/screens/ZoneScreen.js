@@ -59,7 +59,9 @@ export default class ZoneScreen extends React.Component {
       >
         <Text style={styles.title}>A space for your arrival.</Text>
         <Text style={styles.subtitle}>
-          ₪{this.props.navigation.getParam('hourlyRate')}/hour. Time starts
+          {this.props.navigation.getParam('currency', 'ILS')}{' '}
+          {this.props.navigation.getParam('hourlyRate')}/hour ·{' '}
+          {this.props.navigation.getParam('timeZone', 'UTC')}. Time starts
           immediately. Occupancy is managed manually.
         </Text>
         <Input

@@ -1,3 +1,10 @@
+import {
+  countryCodes,
+  formatMoney,
+  toMinorUnits,
+  currencyDigits,
+  cityKey,
+} from "@smartparking/contracts";
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -60,24 +67,35 @@ async function api(path: string, body?: unknown, method?: string) {
   if (!r.ok) throw new Error(data.error || "Something went wrong");
   return data;
 }
-const money = (cents: number) =>
-  new Intl.NumberFormat("en", {
-    style: "currency",
-    currency: "ILS",
-    maximumFractionDigits: 2,
-  }).format(cents / 100);
-const date = (v: Date | string) =>
+const money = formatMoney;
+const date = (v: Date | string, timeZone?: string) =>
   new Date(v).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    ...(timeZone ? { timeZone, timeZoneName: "short" } : {}),
   });
+const countryName = (code: string) =>
+  code
+    ? new Intl.DisplayNames(undefined, { type: "region" }).of(code) || code
+    : "Unspecified country";
+const currencies = Intl.supportedValuesOf("currency");
+const timeZones = Array.from(
+  new Set(["UTC", ...Intl.supportedValuesOf("timeZone")]),
+);
+const countries = countryCodes
+  .slice()
+  .sort((a, b) => countryName(a).localeCompare(countryName(b)));
 function App() {
   const [user, setUser] = useState<User | null>(null),
     [checking, setChecking] = useState(true),
     [data, setData] = useState<Data>(empty),
     [page, setPage] = useState("overview"),
+    [country, setCountry] = useState("all"),
+    [city, setCity] = useState("all"),
+    [wallet, setWallet] = useState("ILS"),
+    [formCurrency, setFormCurrency] = useState("USD"),
     [street, setStreet] = useState("all"),
     [zone, setZone] = useState("all"),
     [query, setQuery] = useState(""),
@@ -147,6 +165,9 @@ function App() {
   }, [toast]);
   useEffect(() => {
     setDialogError("");
+    setFormCurrency(
+      dialog?.item?.currency || (dialog?.type === "credit" ? wallet : "USD"),
+    );
   }, [dialog]);
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -239,27 +260,56 @@ function App() {
       />
     );
   const isAdmin = user.role === "admin";
-  const visibleZones = data.zones.filter(
-    (z) => street === "all" || z.streetId === street,
+  const cities = Array.from(
+    new Map(
+      data.streets
+        .filter((s) => country === "all" || s.countryCode === country)
+        .map((s) => [cityKey(s), s]),
+    ).values(),
   );
-  const filteredSpots = data.spots.filter((s) => {
-    const z = data.zones.find((z) => z.id === s.zoneId);
-    return (
-      (street === "all" || z?.streetId === street) &&
+  const visibleStreets = data.streets.filter(
+    (s) =>
+      (country === "all" || s.countryCode === country) &&
+      (city === "all" || cityKey(s) === city),
+  );
+  const visibleZones = data.zones.filter(
+    (z) =>
+      visibleStreets.some((s) => s.id === z.streetId) &&
+      (street === "all" || z.streetId === street),
+  );
+  const streetForZone = (id: string) =>
+    data.streets.find(
+      (s) => s.id === data.zones.find((z) => z.id === id)?.streetId,
+    );
+  const currencyForZone = (id: string) => streetForZone(id)?.currency || "ILS";
+  const zoneLabel = (id: string) => {
+    const z = data.zones.find((z) => z.id === id),
+      s = streetForZone(id);
+    return `${s?.city || ""} ${s?.countryCode || ""} · ${s?.name || ""} · ${z?.name || ""}`;
+  };
+  const balances = user.balances || { ILS: user.balanceCents };
+  const balance = balances[wallet] || 0;
+  const filteredSpots = data.spots.filter(
+    (s) =>
+      visibleZones.some((z) => z.id === s.zoneId) &&
       (zone === "all" || s.zoneId === zone) &&
       (!availableOnly || (s.enabled && !s.occupied && !s.reservationId)) &&
-      `${s.name} ${z?.name}`.toLowerCase().includes(query.toLowerCase())
-    );
-  });
+      `${s.name} ${zoneLabel(s.zoneId)} ${streetForZone(s.zoneId)?.countryCode || ""}`
+        .toLocaleLowerCase()
+        .includes(query.toLocaleLowerCase()),
+  );
   const enabledSpots = data.spots.filter(
     (s) =>
       s.enabled &&
-      data.zones.some(
+      visibleZones.some(
         (z) =>
           z.id === s.zoneId &&
           z.enabled &&
-          data.streets.some((t) => t.id === z.streetId && t.enabled),
+          visibleStreets.some((t) => t.id === z.streetId && t.enabled),
       ),
+  );
+  const featuredStreet = visibleStreets.find(
+    (s) => (street === "all" || s.id === street) && s.enabled,
   );
   const free = enabledSpots.filter(
     (s) => !s.occupied && !s.reservationId,
@@ -299,14 +349,24 @@ function App() {
         });
       if (dialog?.type === "credit")
         await api(`/admin/users/${dialog.item.id}/credit`, {
-          amountCents: Math.round(Number(val("amount")) * 100),
+          amountCents: toMinorUnits(Number(val("amount")), formCurrency),
+          currency: formCurrency,
           reason: val("reason"),
         });
       if (dialog?.type === "street")
         await api("/admin/streets", {
           name: val("name"),
           city: val("city"),
-          image: "",
+          image: val("image"),
+          countryCode: val("countryCode"),
+          currency: formCurrency,
+          timeZone: val("timeZone"),
+          ...(val("latitude")
+            ? {
+                latitude: Number(val("latitude")),
+                longitude: Number(val("longitude")),
+              }
+            : {}),
         });
       if (dialog?.type === "zone")
         await api("/admin/zones", {
@@ -334,7 +394,20 @@ function App() {
       if (dialog?.type === "editStreet")
         await api(
           `/admin/streets/${dialog.item.id}`,
-          { name: val("name"), city: val("city") },
+          {
+            name: val("name"),
+            city: val("city"),
+            countryCode: val("countryCode"),
+            currency: formCurrency,
+            timeZone: val("timeZone"),
+            image: val("image"),
+            ...(val("latitude")
+              ? {
+                  latitude: Number(val("latitude")),
+                  longitude: Number(val("longitude")),
+                }
+              : {}),
+          },
           "PATCH",
         );
       setDialog(null);
@@ -397,7 +470,23 @@ function App() {
           <div className="balance-card">
             <CreditCard size={19} />
             <small>Your parking balance</small>
-            <strong>{money(user.balanceCents)}</strong>
+            <select
+              aria-label="Balance currency"
+              value={wallet}
+              onChange={(e) => setWallet(e.target.value)}
+            >
+              {Array.from(
+                new Set([
+                  ...Object.keys(balances),
+                  ...data.streets.map((s) => s.currency),
+                ]),
+              ).map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <strong>{money(balance, wallet)}</strong>
             <span>Credits are managed by your administrator.</span>
           </div>
           <div className="profile">
@@ -431,7 +520,23 @@ function App() {
           </div>
           <div className="topbar-right">
             <div className="mobile-account">
-              <span>{money(user.balanceCents)}</span>
+              <select
+                aria-label="Mobile balance currency"
+                value={wallet}
+                onChange={(e) => setWallet(e.target.value)}
+              >
+                {Array.from(
+                  new Set([
+                    ...Object.keys(balances),
+                    ...data.streets.map((s) => s.currency),
+                  ]),
+                ).map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+              <span>{money(balance, wallet)}</span>
               <button
                 aria-label="Sign out"
                 className="icon-btn"
@@ -483,6 +588,47 @@ function App() {
               Refresh
             </button>
           </div>
+          {["overview", "parking", "settings"].includes(page) && (
+            <div className="location-toolbar">
+              <MapPin size={18} />
+              <select
+                aria-label="Filter country"
+                value={country}
+                onChange={(e) => {
+                  setCountry(e.target.value);
+                  setCity("all");
+                  setStreet("all");
+                  setZone("all");
+                }}
+              >
+                <option value="all">All countries</option>
+                {Array.from(
+                  new Set(data.streets.map((s) => s.countryCode)),
+                ).map((c) => (
+                  <option key={c} value={c}>
+                    {countryName(c)}
+                  </option>
+                ))}
+              </select>
+              <select
+                aria-label="Filter city"
+                value={city}
+                onChange={(e) => {
+                  setCity(e.target.value);
+                  setStreet("all");
+                  setZone("all");
+                }}
+              >
+                <option value="all">All cities</option>
+                {cities.map((s) => (
+                  <option key={cityKey(s)} value={cityKey(s)}>
+                    {s.city} · {countryName(s.countryCode)}
+                  </option>
+                ))}
+              </select>
+              <span>{visibleStreets.length} streets in view</span>
+            </div>
+          )}
           {error && (
             <div className="alert" role="alert">
               {error}
@@ -499,7 +645,7 @@ function App() {
                   Your space is reserved · {spotName(myActive.spotId)}
                 </strong>
                 <span>
-                  Until {date(myActive.expiresAt)} ·{" "}
+                  Until {date(myActive.expiresAt, myActive.timeZone)} ·{" "}
                   {myActive.confirmed
                     ? "Arrival confirmed"
                     : "Confirm your arrival in Reservations"}
@@ -521,7 +667,7 @@ function App() {
                   icon={CircleParking}
                   label="Total spaces"
                   value={enabledSpots.length}
-                  detail={`${data.zones.filter((z) => z.enabled).length} zones in your network`}
+                  detail={`${visibleZones.filter((z) => z.enabled).length} zones in your network`}
                 />
                 <Stat
                   icon={ArrowDownLeft}
@@ -533,8 +679,12 @@ function App() {
                 <Stat
                   icon={Clock3}
                   label="Active reservations"
-                  value={active.length}
-                  detail="Bookings currently in progress"
+                  value={
+                    active.filter((r) =>
+                      visibleZones.some((z) => z.id === r.zoneId),
+                    ).length
+                  }
+                  detail="Bookings currently in this view"
                 />
                 <Stat
                   icon={MapPin}
@@ -549,21 +699,36 @@ function App() {
                     <div className="panel-heading">
                       <div>
                         <h2>Your network at a glance</h2>
-                        <p>One street. Many possibilities.</p>
+                        <p>
+                          {cities.length} cities · {visibleStreets.length}{" "}
+                          streets · one connected network
+                        </p>
                       </div>
-                      <span className="tag">{data.streets.length} streets</span>
+                      <span className="tag">
+                        {visibleStreets.length} streets
+                      </span>
                     </div>
                     <div className="street-feature">
-                      <img
-                        src="/images/jaffa.jpg"
-                        alt="Original project map of Jaffa Street"
-                      />
+                      {featuredStreet?.image && (
+                        <img
+                          src={featuredStreet.image}
+                          alt={`Parking overview of ${featuredStreet.name}`}
+                        />
+                      )}
                       <div className="street-overlay">
                         <span className="tag light">
-                          THE ORIGINAL SMARTPARKING STREET
+                          {featuredStreet
+                            ? `${featuredStreet.city} · ${countryName(featuredStreet.countryCode)}`
+                            : "YOUR GLOBAL PARKING NETWORK"}
                         </span>
-                        <h3>It all starts on Jaffa.</h3>
-                        <p>Less circling. More arriving.</p>
+                        <h3>
+                          {featuredStreet?.name || "Every city. Every street."}
+                        </h3>
+                        <p>
+                          {featuredStreet
+                            ? `${featuredStreet.currency} · ${featuredStreet.timeZone}`
+                            : "Add your first street to get started."}
+                        </p>
                         <button
                           onClick={() => setPage("parking")}
                           className="button white"
@@ -583,7 +748,7 @@ function App() {
                       <CircleParking size={21} />
                     </div>
                     <div className="zone-bars">
-                      {data.zones.slice(0, 6).map((z) => {
+                      {visibleZones.map((z) => {
                         const spots = enabledSpots.filter(
                             (s) => s.zoneId === z.id,
                           ),
@@ -609,8 +774,8 @@ function App() {
                           </div>
                         );
                       })}
-                      {!data.zones.length && (
-                        <Empty text="Add a street and zone to start your parking network." />
+                      {!visibleZones.length && (
+                        <Empty text="No zones in this location. Add a street and zone to get started." />
                       )}
                     </div>
                     <button
@@ -651,7 +816,7 @@ function App() {
                     <Search size={17} />
                     <input
                       aria-label="Search spaces"
-                      placeholder="Search spaces or zones…"
+                      placeholder="Search city, street, zone, or space…"
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                     />
@@ -665,9 +830,9 @@ function App() {
                     }}
                   >
                     <option value="all">All streets</option>
-                    {data.streets.map((s) => (
+                    {visibleStreets.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.name}
+                        {s.city} {s.countryCode} · {s.name} · {s.currency}
                       </option>
                     ))}
                   </select>
@@ -679,7 +844,7 @@ function App() {
                     <option value="all">All zones</option>
                     {visibleZones.map((z) => (
                       <option key={z.id} value={z.id}>
-                        {z.name}
+                        {zoneLabel(z.id)}
                       </option>
                     ))}
                   </select>
@@ -740,12 +905,20 @@ function App() {
                           <span />
                         </div>
                         <div className="spot-info">
-                          <span>{zoneName(s.zoneId)}</span>
+                          <span title={zoneLabel(s.zoneId)}>
+                            {zoneLabel(s.zoneId)}
+                          </span>
                           <span>{s.distance} m</span>
                         </div>
                         <div className="spot-action">
                           <strong>
-                            {money(Math.round((parent?.hourlyRate || 0) * 100))}
+                            {money(
+                              toMinorUnits(
+                                parent?.hourlyRate || 0,
+                                currencyForZone(s.zoneId),
+                              ),
+                              currencyForZone(s.zoneId),
+                            )}
                             <small> / hr</small>
                           </strong>
                           {isAdmin ? (
@@ -854,7 +1027,11 @@ function App() {
                       <tr key={r.id}>
                         <td>
                           <strong>{spotName(r.spotId)}</strong>
-                          <small>{zoneName(r.zoneId)}</small>
+                          <small>
+                            {r.city || streetForZone(r.zoneId)?.city} ·{" "}
+                            {r.streetName || streetForZone(r.zoneId)?.name} ·{" "}
+                            {zoneName(r.zoneId)}
+                          </small>
                         </td>
                         {isAdmin && (
                           <td>
@@ -864,13 +1041,13 @@ function App() {
                         )}
                         <td>{r.vehiclePlate}</td>
                         <td>
-                          {date(r.expiresAt)}
+                          {date(r.expiresAt, r.timeZone)}
                           <small>
                             {r.hours} hours ·{" "}
                             {r.confirmed ? "Arrived" : "Not confirmed"}
                           </small>
                         </td>
-                        <td>{money(r.paidCents)}</td>
+                        <td>{money(r.paidCents, r.currency)}</td>
                         <td>
                           <span
                             className={`pill ${r.status === "active" ? "reserved" : "muted"}`}
@@ -980,7 +1157,13 @@ function App() {
                           <span className="pill muted">{u.role}</span>
                         </td>
                         <td>
-                          <strong>{money(u.balanceCents)}</strong>
+                          <strong>
+                            {Object.entries(
+                              u.balances || { ILS: u.balanceCents },
+                            )
+                              .map(([code, amount]) => money(amount, code))
+                              .join(" · ")}
+                          </strong>
                         </td>
                         <td>
                           <button
@@ -1016,7 +1199,7 @@ function App() {
                     Add street
                   </button>
                 </div>
-                {data.streets.map((s) => (
+                {visibleStreets.map((s) => (
                   <div className="setting-row" key={s.id}>
                     <span className="setting-icon">
                       <MapPin size={20} />
@@ -1024,7 +1207,8 @@ function App() {
                     <div>
                       <strong>{s.name}</strong>
                       <small>
-                        {s.city} ·{" "}
+                        {s.city} · {countryName(s.countryCode)} · {s.currency} ·{" "}
+                        {s.timeZone} ·{" "}
                         {data.zones.filter((z) => z.streetId === s.id).length}{" "}
                         zones · {s.enabled ? "Enabled" : "Archived"}
                       </small>
@@ -1059,7 +1243,7 @@ function App() {
                 <div className="panel-heading">
                   <div>
                     <h2>Zones</h2>
-                    <p>Set rates, distances, and availability.</p>
+                    <p>Set local rates, distances, and availability.</p>
                   </div>
                   <button
                     className="button primary"
@@ -1069,7 +1253,7 @@ function App() {
                     Add zone
                   </button>
                 </div>
-                {data.zones.map((z) => (
+                {visibleZones.map((z) => (
                   <div className="setting-row" key={z.id}>
                     <span className="setting-icon">
                       <CircleParking size={20} />
@@ -1078,7 +1262,11 @@ function App() {
                       <strong>{z.name}</strong>
                       <small>
                         {data.streets.find((s) => s.id === z.streetId)?.name} ·{" "}
-                        {z.distance} m · {money(Math.round(z.hourlyRate * 100))}
+                        {z.distance} m ·{" "}
+                        {money(
+                          toMinorUnits(z.hourlyRate, currencyForZone(z.id)),
+                          currencyForZone(z.id),
+                        )}
                         /hr · {z.enabled ? "Enabled" : "Archived"}
                       </small>
                     </div>
@@ -1184,12 +1372,18 @@ function App() {
                   </Field>
                   <div className="booking-price">
                     {money(
-                      Math.round(
-                        (data.zones.find((z) => z.id === dialog.item.zoneId)
-                          ?.hourlyRate || 0) * 100,
+                      toMinorUnits(
+                        data.zones.find((z) => z.id === dialog.item.zoneId)
+                          ?.hourlyRate || 0,
+                        currencyForZone(dialog.item.zoneId),
                       ),
+                      currencyForZone(dialog.item.zoneId),
                     )}{" "}
-                    per hour · Balance {money(user.balanceCents)}
+                    per hour · Balance{" "}
+                    {money(
+                      balances[currencyForZone(dialog.item.zoneId)] || 0,
+                      currencyForZone(dialog.item.zoneId),
+                    )}
                   </div>
                 </>
               )}
@@ -1209,15 +1403,19 @@ function App() {
               )}
               {dialog.type === "credit" && (
                 <>
-                  <Field label="Amount (NIS)">
+                  <CurrencyField
+                    value={formCurrency}
+                    onChange={setFormCurrency}
+                  />
+                  <Field label={`Amount (${formCurrency})`}>
                     <input
                       autoFocus
                       required
                       name="amount"
                       type="number"
-                      min="0.01"
+                      min={10 ** -currencyDigits(formCurrency)}
                       max="1000"
-                      step="0.01"
+                      step={10 ** -currencyDigits(formCurrency)}
                       placeholder="50.00"
                     />
                   </Field>
@@ -1240,32 +1438,108 @@ function App() {
                     autoFocus
                     required
                     name="name"
+                    dir="auto"
                     maxLength={100}
                     defaultValue={dialog.item?.name || ""}
                     placeholder={
-                      dialog.type === "spot" ? "e.g. J1-09" : "Display name"
+                      dialog.type === "spot" ? "e.g. A-09" : "Display name"
                     }
                   />
                 </Field>
               )}
               {["street", "editStreet"].includes(dialog.type) && (
-                <Field label="City">
-                  <input
-                    required
-                    name="city"
-                    maxLength={100}
-                    defaultValue={dialog.item?.city || ""}
-                    placeholder="e.g. Jerusalem"
+                <>
+                  <Field label="City">
+                    <input
+                      required
+                      name="city"
+                      maxLength={100}
+                      defaultValue={dialog.item?.city || ""}
+                      placeholder="City name in any language"
+                      dir="auto"
+                    />
+                  </Field>
+                  <Field label="Country">
+                    <select
+                      name="countryCode"
+                      aria-label="Country"
+                      defaultValue={dialog.item?.countryCode || ""}
+                      required
+                    >
+                      <option value="">Choose a country</option>
+                      {countries.map((c) => (
+                        <option key={c} value={c}>
+                          {countryName(c)} ({c})
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <CurrencyField
+                    value={formCurrency}
+                    onChange={setFormCurrency}
+                    disabled={dialog.type === "editStreet"}
                   />
-                </Field>
+                  {dialog.type === "editStreet" && (
+                    <input type="hidden" name="currency" value={formCurrency} />
+                  )}
+                  <Field label="Local time zone">
+                    <input
+                      name="timeZone"
+                      required
+                      list="time-zones"
+                      defaultValue={dialog.item?.timeZone || "UTC"}
+                      placeholder="e.g. Europe/London"
+                    />
+                    <datalist id="time-zones">
+                      {timeZones.map((t) => (
+                        <option key={t} value={t} />
+                      ))}
+                    </datalist>
+                  </Field>
+                  <Field label="Street image URL (optional)">
+                    <input
+                      name="image"
+                      type="text"
+                      defaultValue={dialog.item?.image || ""}
+                      placeholder="https://…"
+                      maxLength={500}
+                    />
+                  </Field>
+                  <div className="form-row">
+                    <Field label="Latitude (optional)">
+                      <input
+                        type="number"
+                        step="any"
+                        name="latitude"
+                        min="-90"
+                        max="90"
+                        defaultValue={dialog.item?.latitude ?? ""}
+                      />
+                    </Field>
+                    <Field label="Longitude (optional)">
+                      <input
+                        type="number"
+                        step="any"
+                        name="longitude"
+                        min="-180"
+                        max="180"
+                        defaultValue={dialog.item?.longitude ?? ""}
+                      />
+                    </Field>
+                  </div>
+                  <small>
+                    Currency stays fixed after a street is created. Reservations
+                    keep their original rate and time zone.
+                  </small>
+                </>
               )}
               {dialog.type === "zone" && (
                 <Field label="Street">
                   <select name="streetId" required>
                     <option value="">Select a street</option>
-                    {data.streets.map((s) => (
+                    {visibleStreets.map((s) => (
                       <option value={s.id} key={s.id}>
-                        {s.name}
+                        {s.city} {s.countryCode} · {s.name} · {s.currency}
                       </option>
                     ))}
                   </select>
@@ -1275,10 +1549,9 @@ function App() {
                 <Field label="Zone">
                   <select name="zoneId" required>
                     <option value="">Select a zone</option>
-                    {data.zones.map((z) => (
+                    {visibleZones.map((z) => (
                       <option value={z.id} key={z.id}>
-                        {data.streets.find((s) => s.id === z.streetId)?.name} ·{" "}
-                        {z.name}
+                        {zoneLabel(z.id)}
                       </option>
                     ))}
                   </select>
@@ -1298,15 +1571,15 @@ function App() {
                 </Field>
               )}
               {["zone", "editZone"].includes(dialog.type) && (
-                <Field label="Hourly rate (NIS)">
+                <Field label="Hourly rate (street currency)">
                   <input
                     required
                     name="hourlyRate"
                     type="number"
                     min="0"
                     max="10000"
-                    step="0.01"
-                    defaultValue={dialog.item?.hourlyRate ?? 2}
+                    step="any"
+                    defaultValue={dialog.item?.hourlyRate ?? 0}
                   />
                 </Field>
               )}
@@ -1437,7 +1710,7 @@ function Auth({ onLogin }: { onLogin: (u: User) => void }) {
             <div />
           </div>
         </div>
-        <small>From a Jaffa Street idea to a smarter way to park.</small>
+        <small>One connected network. A world of places to park.</small>
       </section>
       <section className="auth-form">
         <div className="auth-box">
@@ -1511,6 +1784,7 @@ function Auth({ onLogin }: { onLogin: (u: User) => void }) {
                 />
               </Field>
             )}
+
             {error && (
               <div className="alert" role="alert">
                 {error}
@@ -1544,3 +1818,31 @@ function Auth({ onLogin }: { onLogin: (u: User) => void }) {
   );
 }
 createRoot(document.getElementById("root")!).render(<App />);
+
+function CurrencyField({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Field label="Currency">
+      <select
+        name="currency"
+        aria-label="Currency"
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        {currencies.map((c) => (
+          <option key={c} value={c}>
+            {c} · {new Intl.DisplayNames(undefined, { type: "currency" }).of(c)}
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+}

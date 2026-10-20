@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test apps/api/test/*.test.ts",
     "db:seed": "tsx --env-file=.env.local scripts/seed.ts",
-    "admin:promote": "tsx --env-file=.env.local scripts/promote-admin.ts"
+    "admin:promote": "tsx --env-file=.env.local scripts/promote-admin.ts",
+    "db:demo": "tsx --env-file=.env.local scripts/seed.ts --demo"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.9",

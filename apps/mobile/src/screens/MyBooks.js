@@ -55,9 +55,19 @@ export default class MyBooks extends React.Component {
               {r.vehiclePlate} · {r.status}
             </Text>
             <Text style={styles.text}>
-              Until {new Date(r.expiresAt).toLocaleString()}
+              {r.city} · {r.streetName}
+              {'\n'}Until{' '}
+              {new Date(r.expiresAt)
+                .toISOString()
+                .replace('T', ' ')
+                .slice(0, 16) + ' UTC'}{' '}
+              · Street zone: {r.timeZone}
               {'\n'}
-              {r.hours} hours · ₪{(r.paidCents / 100).toFixed(2)} prepaid{'\n'}
+              {r.hours} hours · {r.currency}{' '}
+              {(r.paidCents / 10 ** (r.currencyDigits ?? 2)).toFixed(
+                r.currencyDigits ?? 2,
+              )}{' '}
+              prepaid{'\n'}
               {r.confirmed ? 'Arrival confirmed' : 'Arrival not confirmed'}
             </Text>
             {r.status === 'active' && (

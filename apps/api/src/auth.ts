@@ -1,3 +1,4 @@
+import { currencyDigits } from "@smartparking/contracts";
 import { randomBytes, scrypt, timingSafeEqual, createHash } from "node:crypto";
 import { promisify } from "node:util";
 import type { Request, Response, NextFunction } from "express";
@@ -36,6 +37,7 @@ export function publicUser(user: any): User {
     createdAt,
     balanceCents = 0,
   } = user;
+  const balances = { ...user.balances, ILS: balanceCents };
   return {
     id,
     email,
@@ -45,17 +47,19 @@ export function publicUser(user: any): User {
     role,
     createdAt,
     balanceCents,
+    balances,
+    balanceDigits: Object.fromEntries(
+      Object.keys(balances).map((c) => [c, currencyDigits(c)]),
+    ),
   };
 }
 export async function createSession(userId: string, res: Response) {
   const token = randomBytes(32).toString("base64url");
-  await (await db())
-    .collection("sessions")
-    .insertOne({
-      userId,
-      tokenHash: hashToken(token),
-      expiresAt: new Date(Date.now() + 7 * 86400000),
-    });
+  await (await db()).collection("sessions").insertOne({
+    userId,
+    tokenHash: hashToken(token),
+    expiresAt: new Date(Date.now() + 7 * 86400000),
+  });
   res.cookie("sp_session", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -86,12 +90,10 @@ export async function authenticate(
   const user =
     session && (await d.collection("users").findOne({ id: session.userId }));
   if (!user)
-    return res
-      .status(401)
-      .json({
-        status: "failed",
-        error: "Session expired. Please sign in again",
-      });
+    return res.status(401).json({
+      status: "failed",
+      error: "Session expired. Please sign in again",
+    });
   req.user = publicUser(user);
   req.sessionHash = tokenHash;
   next();

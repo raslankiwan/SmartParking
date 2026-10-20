@@ -25,14 +25,26 @@ The migration preserves the native source under `apps/mobile`, removes tracked A
 
 The companion [ParkingServer repository](https://github.com/raslankiwan/ParkingServer) was reviewed at commit `f0d2309`. It contains four Express/Firebase endpoints, no database export or seed inventory, and seven Jaffa images that are byte-for-byte identical to the assets preserved in `apps/mobile`. Registration starts accounts with zero credit, matching the new backend. No additional behavior or unique assets needed importing.
 
-| Old server route | Monorepo replacement |
-| --- | --- |
-| `POST /auth` | `POST /api/auth/login` |
-| `POST /register` | `POST /api/auth/register` |
-| `POST /fetchZones/:id` | `GET /api/zones?streetId=UUID` and `GET /api/spots?zoneId=UUID` |
-| `POST /reserveSpot/:zoneId/:spotName` | `POST /api/reservations` with `{spotId,vehiclePlate,hours}` |
+| Old server route                      | Monorepo replacement                                            |
+| ------------------------------------- | --------------------------------------------------------------- |
+| `POST /auth`                          | `POST /api/auth/login`                                          |
+| `POST /register`                      | `POST /api/auth/register`                                       |
+| `POST /fetchZones/:id`                | `GET /api/zones?streetId=UUID` and `GET /api/spots?zoneId=UUID` |
+| `POST /reserveSpot/:zoneId/:spotName` | `POST /api/reservations` with `{spotId,vehiclePlate,hours}`     |
 
 The original reservation route directly set physical occupancy without authentication, ownership, billing, or booking history. Its replacement authenticates the driver and atomically records the reservation, credit debit and space lock while retaining physical occupancy as a separate field. The updated clients use the new API contract; old endpoint URLs and serialized-user responses are not compatibility interfaces. Historical Firebase data was not accessed or migrated because the repository contains no data export. ParkingServer is archived with a pointer to this monorepo, preserving its Git history as a reference.
+
+## Global locations and currencies
+
+The application supports cities and streets worldwide. Create a street under **Streets & zones**, specifying its city, country, ISO currency and IANA time zone, then add any number of zones and spaces. A city appears in the country/city selectors as soon as its first street exists. City identity includes country: matching city and street names in different countries remain distinct. Names support Unicode, including non-Latin scripts. Optional latitude/longitude and an image URL describe each street without tying it to a map provider.
+
+The web portal filters by country → city → street → zone, searches location names, and builds its featured location and availability panels from actual data. The native app searches cities/countries/streets and carries each street's monetary settings through booking screens. Display follows the browser's locale; the interface copy remains English. Web booking times use the snapshotted street time zone; the legacy native client shows unambiguous UTC timestamps plus the street's zone identifier.
+
+Each currency has a separate prepaid wallet. There is **no foreign-exchange conversion**: USD credit cannot pay for JPY parking. Credits, debits and refunds use integer minor units, with the currency's actual decimal precision (for example JPY=0, USD=2, KWD=3). The historical field names `amountCents`/`paidCents` mean minor units for the accompanying `currency`. `balanceCents` remains the legacy ILS wallet; the API exposes `balances` and `balanceDigits` for every wallet. Street currency is fixed at creation. Rates, currency, location and time zone are snapshotted on reservations, so later location/rate edits do not rewrite booking history or renewal pricing.
+
+Existing records remain usable: missing currencies are interpreted as ILS and missing time zones as UTC. Existing physical locations are never guessed from street names. Index setup adds the missing legacy country field and replaces the old city/street uniqueness index with country/city/street uniqueness. Balances and booking amounts are never converted or reset.
+
+Normal setup creates indexes only: `npm run db:seed` does **not** add any city or parking inventory. `npm run db:demo` explicitly adds the historical Jaffa sample (six zones, 48 spaces) without resetting existing data. Previously seeded sample records remain available and can be archived through the admin portal. New installations start ready for their own locations.
 
 ## Local development
 
@@ -46,7 +58,7 @@ npm run db:seed
 npm run dev
 ```
 
-Open http://127.0.0.1:5173. The API listens on 127.0.0.1:3001 and Vite proxies `/api`. MongoDB **must support transactions**: use Atlas or a local replica set. The original code did not specify a city; the seed uses “Unspecified” so the administrator can set it. The seed inserts the original street and zones plus **48 sample spaces**, all initially available. It does not represent live street sensors and never resets existing records. Set `MONGODB_DB=smartparking_development` for an isolated local database.
+Open http://127.0.0.1:5173. The API listens on 127.0.0.1:3001 and Vite proxies `/api`. MongoDB **must support transactions**: use Atlas or a local replica set. Normal seeding initializes indexes only. The optional `npm run db:demo` adds the historical Jaffa example with city “Unspecified”, six zones and **48 sample spaces**, initially available. Sample inventory does not represent live sensors and never resets existing records. Set `MONGODB_DB=smartparking_development` for an isolated local database.
 
 ```sh
 npm test       # Real MongoDB replica-set integration tests in an isolated temporary DB
@@ -76,7 +88,7 @@ npm run admin:promote -- email@example.com
 ## Booking rules
 
 - Reservations start immediately, for 1–24 integer hours. Each driver and each spot can have one active reservation.
-- The zone rate is snapshotted at booking. Balances use integer cents. Booking, renewal, reservation locks and ledger entries share MongoDB transactions.
+- The zone rate is snapshotted at booking. Balances use integer minor units in separate currency wallets. Booking, renewal, reservation locks and ledger entries share MongoDB transactions.
 - Insufficient credit, occupied/archived spaces, and disabled streets/zones reject new bookings. Failed bookings do not charge the driver.
 - Drivers confirm arrival, renew by 1–24 hours (up to 168 total), finish, or cancel their own reservations. Administrators can end any active reservation.
 - Cancelling **before** arrival confirmation refunds the entire prepaid amount once. Confirmed or expired time is non-refundable. Physical occupancy is independent of a reservation; ending one does not falsely mark a physically occupied space free.
@@ -88,24 +100,25 @@ npm run admin:promote -- email@example.com
 
 All endpoints return `{status:"success", ...}` or `{status:"failed", error}`. Authentication is required except register/login. Browser sessions use an HttpOnly, SameSite=Lax cookie (Secure in production). Native clients send the returned token as `Authorization: Bearer <token>`. Sessions expire after 7 days and are revoked on logout. Passwords use salted scrypt; only session-token hashes are stored. JSON-only mutation requests and an explicit `APP_ORIGIN` check protect cookie requests. Login/registration attempts are throttled per normalized email using database counters (20 per 15-minute bucket).
 
-| Method     | Route                                 | Behavior                                           |
-| ---------- | ------------------------------------- | -------------------------------------------------- |
-| GET        | `/api/health`                         | Service and MongoDB readiness                      |
-| POST       | `/api/auth/register`                  | Create driver or consume a valid admin invitation  |
-| POST       | `/api/auth/login`, `/api/auth/logout` | Start/revoke session                               |
-| GET        | `/api/auth/me`                        | Current user and credit balance                    |
-| GET        | `/api/streets`                        | Enabled streets                                    |
-| GET        | `/api/zones?streetId=UUID`            | Enabled zones                                      |
-| GET        | `/api/spots?zoneId=UUID`              | Enabled spaces and availability                    |
-| GET/POST   | `/api/reservations`                   | Own history / create `{spotId,vehiclePlate,hours}` |
-| POST       | `/api/reservations/:id/confirm`       | Confirm arrival                                    |
-| POST       | `/api/reservations/:id/renew`         | Extend with `{hours}`                              |
-| POST       | `/api/reservations/:id/end`           | End with `{status:"completed"\|"cancelled"}`       |
-| GET        | `/api/admin/overview`                 | Admin network, drivers and reservation history     |
-| POST/PATCH | `/api/admin/streets[/:id]`            | Create/update/archive streets                      |
-| POST/PATCH | `/api/admin/zones[/:id]`              | Create/update/archive zones and rates              |
-| POST/PATCH | `/api/admin/spots[/:id]`              | Create/update/archive spots and occupancy          |
-| POST       | `/api/admin/users/:id/credit`         | Add `{amountCents,reason}` to the audit ledger     |
+| Method     | Route                                 | Behavior                                                |
+| ---------- | ------------------------------------- | ------------------------------------------------------- |
+| GET        | `/api/health`                         | Service and MongoDB readiness                           |
+| POST       | `/api/auth/register`                  | Create driver or consume a valid admin invitation       |
+| POST       | `/api/auth/login`, `/api/auth/logout` | Start/revoke session                                    |
+| GET        | `/api/auth/me`                        | Current user and credit balance                         |
+| GET        | `/api/cities`                         | Countries/cities derived from enabled streets           |
+| GET        | `/api/streets`                        | Enabled streets                                         |
+| GET        | `/api/zones?streetId=UUID`            | Enabled zones                                           |
+| GET        | `/api/spots?zoneId=UUID`              | Enabled spaces and availability                         |
+| GET/POST   | `/api/reservations`                   | Own history / create `{spotId,vehiclePlate,hours}`      |
+| POST       | `/api/reservations/:id/confirm`       | Confirm arrival                                         |
+| POST       | `/api/reservations/:id/renew`         | Extend with `{hours}`                                   |
+| POST       | `/api/reservations/:id/end`           | End with `{status:"completed"\|"cancelled"}`            |
+| GET        | `/api/admin/overview`                 | Admin network, drivers and reservation history          |
+| POST/PATCH | `/api/admin/streets[/:id]`            | Create/update/archive streets                           |
+| POST/PATCH | `/api/admin/zones[/:id]`              | Create/update/archive zones and rates                   |
+| POST/PATCH | `/api/admin/spots[/:id]`              | Create/update/archive spots and occupancy               |
+| POST       | `/api/admin/users/:id/credit`         | Add `{amountCents,currency,reason}` to the audit ledger |
 
 History is limited to the latest 100 reservations per driver. Admin overview is capped at 1,000 records per collection; this starter is intended for a small parking network. Add pagination before expanding beyond this capacity. Roles are enforced on the server. Parent IDs cannot change after creation, preserving historical relationships.
 

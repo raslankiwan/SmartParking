@@ -2,6 +2,13 @@ import { randomUUID } from "node:crypto";
 import { db, indexes, closeDb } from "../apps/api/src/db.js";
 await indexes();
 const d = await db();
+if (!process.argv.includes("--demo")) {
+  console.log(
+    "Database indexes ready. No location or sample inventory was created. Add streets in the admin portal, or run npm run db:demo explicitly.",
+  );
+  await closeDb();
+  process.exit(0);
+}
 let street = await d
   .collection("streets")
   .findOne({ seedKey: "original-jaffa" });
@@ -11,6 +18,9 @@ if (!street) {
     name: "Jaffa Street",
     seedKey: "original-jaffa",
     city: "Unspecified",
+    countryCode: "",
+    currency: "ILS",
+    timeZone: "UTC",
     image: "/images/jaffa.jpg",
     enabled: true,
   });

@@ -1,3 +1,8 @@
+import {
+  countryCodes,
+  currencyDigits,
+  toMinorUnits,
+} from "@smartparking/contracts";
 import express from "express";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
@@ -71,6 +76,44 @@ const emailSchema = z
   .email()
   .max(254)
   .transform((s) => s.toLowerCase());
+const currencies = new Set(Intl.supportedValuesOf("currency"));
+const currencySchema = z
+  .string()
+  .toUpperCase()
+  .refine((v) => currencies.has(v), "Choose a supported ISO currency");
+const timeZoneSchema = z
+  .string()
+  .max(100)
+  .refine((v) => {
+    try {
+      new Intl.DateTimeFormat("en", { timeZone: v });
+      return true;
+    } catch {
+      return false;
+    }
+  }, "Choose a valid IANA time zone");
+const countrySchema = z
+  .string()
+  .toUpperCase()
+  .refine(
+    (v) => v === "" || countryCodes.includes(v),
+    "Use a supported two-letter country code",
+  );
+const walletField = (currency: string) =>
+  currency === "ILS" ? "balanceCents" : `balances.${currency}`;
+const normalizeStreet = (street: any) => ({
+  ...strip(street),
+  countryCode: street.countryCode || "",
+  currency: street.currency || "ILS",
+  currencyDigits: currencyDigits(street.currency || "ILS"),
+  timeZone: street.timeZone || "UTC",
+});
+const normalizeReservation = (r: any) => ({
+  ...strip(r),
+  currency: r.currency || "ILS",
+  currencyDigits: currencyDigits(r.currency || "ILS"),
+  timeZone: r.timeZone || "UTC",
+});
 const passwordSchema = z.string().min(10).max(128);
 const registerSchema = z.object({
   email: emailSchema,
@@ -171,17 +214,58 @@ app.post("/api/auth/logout", authenticate, async (req, res) => {
 app.get("/api/auth/me", authenticate, (req, res) =>
   ok(res, { user: req.user }),
 );
-app.get("/api/streets", authenticate, async (_req, res) =>
+app.get("/api/streets", authenticate, async (req, res) =>
   ok(res, {
     streets: await (
       await db()
     )
       .collection("streets")
-      .find({ enabled: true }, { projection: { _id: 0 } })
+      .find(
+        {
+          enabled: true,
+          ...(req.query.city
+            ? { city: z.string().max(100).parse(req.query.city) }
+            : {}),
+          ...(req.query.countryCode !== undefined
+            ? { countryCode: countrySchema.parse(req.query.countryCode) }
+            : {}),
+        },
+        { projection: { _id: 0 } },
+      )
       .sort({ name: 1 })
-      .toArray(),
+      .toArray()
+      .then((rows) => rows.map(normalizeStreet)),
   }),
 );
+app.get("/api/cities", authenticate, async (_req, res) => {
+  const cities = await (
+    await db()
+  )
+    .collection("streets")
+    .aggregate([
+      { $match: { enabled: true } },
+      {
+        $group: {
+          _id: {
+            name: "$city",
+            countryCode: { $ifNull: ["$countryCode", ""] },
+          },
+          streetCount: { $sum: 1 },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          name: "$_id.name",
+          countryCode: "$_id.countryCode",
+          streetCount: 1,
+        },
+      },
+      { $sort: { name: 1, countryCode: 1 } },
+    ])
+    .toArray();
+  ok(res, { cities });
+});
 app.get("/api/zones", authenticate, async (req, res) => {
   const streetId = idSchema.parse(req.query.streetId);
   const d = await db();
@@ -227,7 +311,8 @@ app.get("/api/reservations", authenticate, async (req, res) => {
       .find({ userId: req.user!.id }, { projection: { _id: 0 } })
       .sort({ createdAt: -1 })
       .limit(100)
-      .toArray(),
+      .toArray()
+      .then((rows) => rows.map(normalizeReservation)),
   });
 });
 app.post("/api/reservations", authenticate, async (req, res) => {
@@ -257,18 +342,24 @@ app.post("/api/reservations", authenticate, async (req, res) => {
       const zone = await d
         .collection("zones")
         .findOne({ id: spot.zoneId, enabled: true }, { session });
-      if (
-        !zone ||
-        !(await d
-          .collection("streets")
-          .findOne({ id: zone.streetId, enabled: true }, { session }))
-      )
-        fail(409, "This parking area is unavailable");
+      if (!zone) fail(409, "This parking area is unavailable");
+      const street = await d
+        .collection("streets")
+        .findOne({ id: zone.streetId, enabled: true }, { session });
+      if (!street) fail(409, "This parking area is unavailable");
+      const currency = street.currency || "ILS",
+        timeZone = street.timeZone || "UTC";
+      const field = walletField(currency);
       reservation = {
         id: randomUUID(),
         userId: req.user!.id,
         spotId: spot.id,
         zoneId: zone.id,
+        currency,
+        timeZone,
+        streetName: street.name,
+        city: street.city,
+        countryCode: street.countryCode || "",
         vehiclePlate: input.vehiclePlate.toUpperCase(),
         status: "active",
         createdAt: new Date(),
@@ -276,13 +367,13 @@ app.post("/api/reservations", authenticate, async (req, res) => {
         hours: input.hours,
         confirmed: false,
         expiresAt: new Date(Date.now() + input.hours * 3600000),
-        paidCents: Math.round(zone.hourlyRate * 100) * input.hours,
+        paidCents: toMinorUnits(zone.hourlyRate, currency) * input.hours,
       };
       const debit = await d
         .collection("users")
         .updateOne(
-          { id: req.user!.id, balanceCents: { $gte: reservation.paidCents } },
-          { $inc: { balanceCents: -reservation.paidCents } },
+          { id: req.user!.id, [field]: { $gte: reservation.paidCents } },
+          { $inc: { [field]: -reservation.paidCents } },
           { session },
         );
       if (debit.modifiedCount !== 1 && reservation.paidCents > 0)
@@ -293,6 +384,7 @@ app.post("/api/reservations", authenticate, async (req, res) => {
           userId: req.user!.id,
           reservationId: reservation.id,
           amountCents: -reservation.paidCents,
+          currency,
           reason: "booking",
           createdAt: new Date(),
         },
@@ -336,19 +428,23 @@ app.post("/api/reservations/:id/end", authenticate, async (req, res) => {
         );
       if (!reservation) fail(404, "Active reservation not found");
       if (status === "cancelled" && !reservation.confirmed) {
-        await d
-          .collection("users")
-          .updateOne(
-            { id: reservation.userId },
-            { $inc: { balanceCents: reservation.paidCents } },
-            { session },
-          );
+        await d.collection("users").updateOne(
+          { id: reservation.userId },
+          {
+            $inc: {
+              [walletField(reservation.currency || "ILS")]:
+                reservation.paidCents,
+            },
+          },
+          { session },
+        );
         await d.collection("ledger").insertOne(
           {
             id: randomUUID(),
             userId: reservation.userId,
             reservationId: id,
             amountCents: reservation.paidCents,
+            currency: reservation.currency || "ILS",
             reason: "unconfirmed cancellation refund",
             createdAt: new Date(),
           },
@@ -405,12 +501,14 @@ app.post("/api/reservations/:id/renew", authenticate, async (req, res) => {
       if (!reservation) fail(404, "Active reservation not found");
       if (reservation.hours + hours > 168)
         fail(400, "A reservation cannot exceed 7 days");
-      const amount = Math.round(reservation.hourlyRate * 100) * hours;
+      const currency = reservation.currency || "ILS";
+      const field = walletField(currency);
+      const amount = toMinorUnits(reservation.hourlyRate, currency) * hours;
       const debit = await d
         .collection("users")
         .updateOne(
-          { id: req.user!.id, balanceCents: { $gte: amount } },
-          { $inc: { balanceCents: -amount } },
+          { id: req.user!.id, [field]: { $gte: amount } },
+          { $inc: { [field]: -amount } },
           { session },
         );
       if (!debit.modifiedCount && amount > 0) fail(409, "Insufficient balance");
@@ -432,6 +530,7 @@ app.post("/api/reservations/:id/renew", authenticate, async (req, res) => {
           userId: req.user!.id,
           reservationId: id,
           amountCents: -amount,
+          currency,
           reason: "renewal",
           createdAt: new Date(),
         },
@@ -446,9 +545,10 @@ app.post("/api/reservations/:id/renew", authenticate, async (req, res) => {
 app.use("/api/admin", authenticate, admin);
 app.post("/api/admin/users/:id/credit", async (req, res) => {
   const id = idSchema.parse(req.params.id);
-  const { amountCents, reason } = z
+  const { amountCents, reason, currency } = z
     .object({
-      amountCents: z.number().int().min(1).max(100000),
+      amountCents: z.number().int().min(1).max(100000000),
+      currency: currencySchema.default("ILS"),
       reason: z.string().trim().min(3).max(200),
     })
     .parse(req.body);
@@ -460,7 +560,7 @@ app.post("/api/admin/users/:id/credit", async (req, res) => {
         .collection("users")
         .updateOne(
           { id },
-          { $inc: { balanceCents: amountCents } },
+          { $inc: { [walletField(currency)]: amountCents } },
           { session },
         );
       if (!result.matchedCount) fail(404, "User not found");
@@ -470,6 +570,7 @@ app.post("/api/admin/users/:id/credit", async (req, res) => {
           userId: id,
           adminId: req.user!.id,
           amountCents,
+          currency,
           reason,
           createdAt: new Date(),
         },
@@ -501,16 +602,21 @@ app.get("/api/admin/overview", async (_req, res) => {
     ),
   );
   ok(res, {
-    streets,
+    streets: streets.map(normalizeStreet),
     zones,
     spots,
-    reservations,
+    reservations: reservations.map(normalizeReservation),
     users: users.map(publicUser),
   });
 });
 const streetSchema = z.object({
   name: z.string().trim().min(1).max(100),
   city: z.string().trim().min(1).max(100),
+  countryCode: countrySchema.optional(),
+  currency: currencySchema.optional(),
+  timeZone: timeZoneSchema.optional(),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
   image: z
     .string()
     .max(500)
@@ -525,14 +631,7 @@ const zoneSchema = z.object({
   streetId: idSchema,
   name: z.string().trim().min(1).max(100),
   distance: z.number().int().min(0).max(100000),
-  hourlyRate: z
-    .number()
-    .min(0)
-    .max(10000)
-    .refine(
-      (n) => Number.isInteger(Math.round(n * 1000000) / 10000),
-      "Use at most 2 decimal places",
-    ),
+  hourlyRate: z.number().min(0).max(1000000),
   enabled: z.boolean().optional(),
 });
 const spotSchema = z.object({
@@ -548,6 +647,11 @@ for (const [collection, schema] of [
   ["spots", spotSchema],
 ] as const) {
   app.post(`/api/admin/${collection}`, async (req, res) => {
+    if (
+      collection === "streets" &&
+      (req.body.latitude !== undefined) !== (req.body.longitude !== undefined)
+    )
+      fail(400, "Provide both latitude and longitude");
     const input = schema.parse(req.body),
       d = await db();
     if (
@@ -560,10 +664,22 @@ for (const [collection, schema] of [
       !(await d.collection("zones").findOne({ id: input.zoneId }))
     )
       fail(400, "Zone not found");
+    if (
+      collection === "zones" &&
+      "streetId" in input &&
+      "hourlyRate" in input
+    ) {
+      const street = await d
+        .collection("streets")
+        .findOne({ id: input.streetId });
+      validateRate(input.hourlyRate!, street?.currency || "ILS");
+    }
     const item = {
       id: randomUUID(),
       enabled: true,
-      ...(collection === "streets" ? { image: "" } : {}),
+      ...(collection === "streets"
+        ? { image: "", countryCode: "", currency: "ILS", timeZone: "UTC" }
+        : {}),
       ...(collection === "spots"
         ? { occupied: false, reservationId: null }
         : {}),
@@ -575,11 +691,34 @@ for (const [collection, schema] of [
   });
   app.patch(`/api/admin/${collection}/:id`, async (req, res) => {
     const id = idSchema.parse(req.params.id);
+    if (
+      collection === "streets" &&
+      (req.body.latitude !== undefined) !== (req.body.longitude !== undefined)
+    )
+      fail(400, "Provide both latitude and longitude");
     const input = schema.partial().strict().parse(req.body);
     const d = await db();
     // Relationships remain stable once created; this preserves reservation history.
     if ("zoneId" in input || "streetId" in input)
       fail(400, "Create a new item to change its parent");
+    const existing = await d.collection(collection).findOne({ id });
+    if (!existing) fail(404, "Item not found");
+    if (
+      collection === "streets" &&
+      "currency" in input &&
+      input.currency !== (existing.currency || "ILS")
+    ) {
+      fail(
+        409,
+        "Currency is fixed after street creation. Create a new street to preserve rates and booking history",
+      );
+    }
+    if (collection === "zones" && "hourlyRate" in input) {
+      const street = await d
+        .collection("streets")
+        .findOne({ id: existing.streetId });
+      validateRate(input.hourlyRate!, street?.currency || "ILS");
+    }
     const filter: any = { id };
     // Reserved spaces can record physical occupancy, but cannot be archived mid-booking.
     if (collection === "spots" && input.enabled === false)
@@ -590,6 +729,14 @@ for (const [collection, schema] of [
     if (!item) fail(409, "Item not found or has an active reservation");
     ok(res, { item: strip(item) });
   });
+}
+function validateRate(rate: number, currency: string) {
+  const scale = 10 ** currencyDigits(currency);
+  if (Math.abs(rate * scale - Math.round(rate * scale)) > 0.000001)
+    fail(
+      400,
+      `Use at most ${currencyDigits(currency)} decimal places for ${currency}`,
+    );
 }
 async function expireReservations() {
   const d = await db();

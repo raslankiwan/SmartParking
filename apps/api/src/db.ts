@@ -20,6 +20,24 @@ export async function client() {
 }
 export async function indexes() {
   const d = await db();
+  // Additive legacy normalization; no balance, reservation, or rate is changed.
+  await d
+    .collection("streets")
+    .updateMany(
+      { countryCode: { $exists: false } },
+      { $set: { countryCode: "" } },
+    );
+  await d
+    .collection("streets")
+    .createIndex({ countryCode: 1, city: 1, name: 1 }, { unique: true });
+  const existing = await d.collection("streets").listIndexes().toArray();
+  if (existing.some((i) => i.name === "city_1_name_1")) {
+    try {
+      await d.collection("streets").dropIndex("city_1_name_1");
+    } catch (e: any) {
+      if (e.code !== 27) throw e;
+    }
+  }
   await Promise.all([
     d.collection("users").createIndex({ email: 1 }, { unique: true }),
     d.collection("invitations").createIndex({ email: 1 }, { unique: true }),
@@ -48,7 +66,6 @@ export async function indexes() {
     d
       .collection("zones")
       .createIndex({ streetId: 1, name: 1 }, { unique: true }),
-    d.collection("streets").createIndex({ city: 1, name: 1 }, { unique: true }),
   ]);
 }
 export async function closeDb() {

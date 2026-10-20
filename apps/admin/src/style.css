@@ -1587,3 +1587,94 @@ td small {
     display: none;
   }
 }
+
+.location-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 25px;
+  padding: 13px 17px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: #6e8569;
+}
+.location-toolbar select {
+  min-width: 150px;
+  max-width: 290px;
+}
+.location-toolbar > span {
+  margin-left: auto;
+  font-size: 11px;
+}
+.zone-bars {
+  max-height: 340px;
+  overflow: auto;
+}
+.spot-info span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 78%;
+}
+.balance-card select {
+  padding: 4px 7px;
+  font-size: 10px;
+  max-width: 75px;
+  margin-left: auto;
+}
+.street-feature {
+  background:
+    radial-gradient(ellipse at 90% 5%, #91ac79 0%, transparent 55%),
+    linear-gradient(140deg, #193f30, #486442);
+}
+.street-feature:before {
+  content: "";
+  position: absolute;
+  inset: -80%;
+  background: repeating-linear-gradient(
+    35deg,
+    transparent 0 48px,
+    #ffffff0a 49px 50px
+  );
+  transform: rotate(10deg);
+}
+.street-overlay h3 {
+  overflow-wrap: anywhere;
+}
+.table-wrap td {
+  max-width: 400px;
+}
+.table-wrap td small {
+  white-space: normal;
+}
+input[dir="auto"] {
+  text-align: start;
+}
+@media (max-width: 650px) {
+  .location-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px;
+  }
+  .location-toolbar select {
+    flex: 1;
+    min-width: 110px;
+    max-width: 100%;
+  }
+  .location-toolbar > span {
+    width: 100%;
+    font-size: 10px;
+  }
+  .location-toolbar > svg {
+    display: none;
+  }
+  .mobile-account {
+    gap: 6px;
+  }
+  .mobile-account select {
+    max-width: 64px;
+    padding: 5px;
+    font-size: 9px;
+  }
+}
